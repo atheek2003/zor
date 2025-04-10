@@ -1,3 +1,4 @@
 .env
 .open_code_env/
 open_code.egg-info
+open_code/__pycache__/

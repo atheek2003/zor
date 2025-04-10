@@ -18,7 +18,7 @@ load_dotenv()
 api_key = os.getenv("GEMINI_API_KEY")
 if not api_key:
     config = load_config()
-    api_key = confog.get("api_key")
+    api_key = config.get("api_key")
 if api_key:
     genai.configure(api_key=api_key)
 else:

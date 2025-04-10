@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "open_code"
-version = "0.1"
+version = "0.1.1"
 description = "An Open-Source Claude Code like tool"
 authors = [{ name = "Hemanth", email = "arjunbanur27@gmail.com" }]
 readme = "README.md"

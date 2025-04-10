@@ -2,9 +2,12 @@ import os
 import typer
 from dotenv import load_dotenv
 import google.generativeai as genai
+from pathlib import Path
 from .context import get_codebase_context
-from .file_ops import edit_file
+from .file_ops import edit_file, show_diff
 from .git_utils import git_commit
+from .api import generate_with_context
+from .config import load_config, save_config
 from typing import Optional
 
 app = typer.Typer()
@@ -12,14 +15,6 @@ app = typer.Typer()
 # Load API key from environment
 load_dotenv()
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-
-def generate_with_context(prompt: str, context: dict):
-    """Generate a response with codebase context"""
-    model = genai.GenerativeModel('gemini-1.5-flash')
-    context_str = "\n".join(f"File: {path}\n{content}" for path, content in context.items())
-    full_prompt = f"Codebase Context:\n{context_str}\n\nUser Prompt: {prompt}"
-    response = model.generate_content(full_prompt)
-    return response.text
 
 @app.command()
 def ask(prompt: str):
@@ -50,6 +45,50 @@ def commit(message: str):
         typer.echo("Commit failed", err=True)
 
 @app.command()
+def config(key: str = None, value: str = None):
+    """View or update configuration"""
+    current_config = load_config()
+    
+    if key is None and value is None:
+        # Display current config
+        for k, v in current_config.items():
+            typer.echo(f"{k}: {v}")
+        return
+    
+    if key not in current_config:
+        typer.echo(f"Unknown configuration key: {key}", err=True)
+        return
+    
+    if value is None:
+        # Display specific key
+        typer.echo(f"{key}: {current_config[key]}")
+        return
+    
+    # Update config
+    # Convert value to appropriate type based on current value type
+    current_type = type(current_config[key])
+    if current_type == bool:
+        current_config[key] = value.lower() in ("true", "1", "yes", "y")
+    elif current_type == int:
+        current_config[key] = int(value)
+    elif current_type == float:
+        current_config[key] = float(value)
+    elif current_type == list:
+        current_config[key] = value.split(",")
+    else:
+        current_config[key] = value
+    
+    save_config(current_config)
+    typer.echo(f"Updated {key} to {current_config[key]}")
+
+def extract_code_blocks(text):
+    """Extract code blocks from markdown text"""
+    import re
+    pattern = r"```(?:\w+)?\n(.*?)```"
+    matches = re.findall(pattern, text, re.DOTALL)
+    return matches
+
+@app.command()
 def interactive():
     """Start an interactive session with the AI assistant"""
     typer.echo("Starting interactive session. Type 'exit' to quit.")
@@ -72,37 +111,20 @@ def interactive():
             # Add prompt to history
             history.append({"role": "user", "content": prompt})
             
-            # Generate response with context and history
-            model = genai.GenerativeModel('gemini-1.5-flash')
-            
-            # Create context string
-            context_str = "\n".join(f"File: {path}\n{content}" for path, content in context.items())
-            
             # Create history string (simplified)
             history_str = "\n".join(
                 f"{'User' if h['role'] == 'user' else 'Assistant'}: {h['content']}" 
                 for h in history[:-1]
             )
             
-            # Combine everything
+            # Create context for API call
+            context_with_history = context.copy()
             if history_str:
-                full_prompt = (
-                    f"You are an AI coding assistant working with the following codebase:\n\n"
-                    f"Codebase Context:\n{context_str}\n\n"
-                    f"Previous conversation:\n{history_str}\n\n"
-                    f"User: {prompt}"
-                )
-            else:
-                full_prompt = (
-                    f"You are an AI coding assistant working with the following codebase:\n\n"
-                    f"Codebase Context:\n{context_str}\n\n"
-                    f"User: {prompt}"
-                )
+                context_with_history["_conversation_history"] = history_str
             
             # Get response with error handling and rate limiting
             try:
-                response = model.generate_content(full_prompt)
-                answer = response.text
+                answer = generate_with_context(prompt, context_with_history)
                 typer.echo(f"\n{answer}")
                 
                 # Add response to history
@@ -120,7 +142,6 @@ def interactive():
                 
             except Exception as e:
                 typer.echo(f"Error: {e}", err=True)
-                # Implement exponential backoff for rate limiting here
                 
         except KeyboardInterrupt:
             typer.echo("\nExiting interactive mode.")
@@ -128,13 +149,33 @@ def interactive():
     
     typer.echo("Interactive session ended.")
 
-def extract_code_blocks(text):
-    """Extract code blocks from markdown text"""
-    import re
-    pattern = r"```(?:\w+)?\n(.*?)```"
-    matches = re.findall(pattern, text, re.DOTALL)
-    return matches
-
+@app.command()
+def history(limit: int = 5):
+    """Show conversation history"""
+    from rich.console import Console
+    from rich.table import Table
+    from .history import load_history
+    
+    console = Console()
+    history_items = load_history(max_items=limit)
+    
+    if not history_items:
+        console.print("No history found")
+        return
+    
+    table = Table(title="Conversation History")
+    table.add_column("Date", style="cyan")
+    table.add_column("Prompt", style="green")
+    table.add_column("Response", style="yellow")
+    
+    for item in history_items[-limit:]:
+        # Truncate long text
+        prompt = item["prompt"][:50] + "..." if len(item["prompt"]) > 50 else item["prompt"]
+        response = item["response"][:50] + "..." if len(item["response"]) > 50 else item["response"]
+        
+        table.add_row(item["datetime"], prompt, response)
+    
+    console.print(table)
 
 @app.command()
 def generate_test(file_path: str, test_framework: str = "pytest"):
@@ -172,7 +213,6 @@ Existing codebase context is available for reference."""
         with open(test_file_path, "w") as f:
             f.write(tests)
         typer.echo(f"Tests saved to {test_file_path}")
-
 
 @app.command()
 def refactor(prompt: str):
@@ -258,7 +298,6 @@ Only include files that need to be changed. Do not include any explanations outs
                                     default=f"Refactor: {prompt[:50]}")
             if git_commit(commit_msg):
                 typer.echo("Changes committed successfully")
-
 
 if __name__ == "__main__":
     app()

@@ -1,3 +1,4 @@
+
 import json
 import os
 from pathlib import Path
@@ -5,7 +6,7 @@ import typer
 
 # Default configuration
 DEFAULT_CONFIG = {
-    "model": "gemini-1.5-flash",
+    "model": "gemini-2.0-flash",
     "temperature": 0.2,
     "max_tokens": 8192,
     "exclude_dirs": ["node_modules", ".venv", "venv", ".git", "__pycache__", 
@@ -74,42 +75,3 @@ def save_config(config):
         json.dump(config, f, indent=2)
     
     return True
-
-# Add to open_code/main.py
-
-@app.command()
-def config(key: str = None, value: str = None):
-    """View or update configuration"""
-    current_config = load_config()
-    
-    if key is None and value is None:
-        # Display current config
-        for k, v in current_config.items():
-            typer.echo(f"{k}: {v}")
-        return
-    
-    if key not in current_config:
-        typer.echo(f"Unknown configuration key: {key}", err=True)
-        return
-    
-    if value is None:
-        # Display specific key
-        typer.echo(f"{key}: {current_config[key]}")
-        return
-    
-    # Update config
-    # Convert value to appropriate type based on current value type
-    current_type = type(current_config[key])
-    if current_type == bool:
-        current_config[key] = value.lower() in ("true", "1", "yes", "y")
-    elif current_type == int:
-        current_config[key] = int(value)
-    elif current_type == float:
-        current_config[key] = float(value)
-    elif current_type == list:
-        current_config[key] = value.split(",")
-    else:
-        current_config[key] = value
-    
-    save_config(current_config)
-    typer.echo(f"Updated {key} to {current_config[key]}")

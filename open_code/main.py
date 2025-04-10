@@ -14,7 +14,17 @@ app = typer.Typer()
 
 # Load API key from environment
 load_dotenv()
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+
+api_key = os.getenv("GEMINI_API_KEY")
+if not api_key:
+    config = load_config()
+    api_key = confog.get("api_key")
+if api_key:
+    genai.configure(api_key=api_key)
+else:
+    typer.echo("No Gemini API key found. Run 'admino setup' to configure your API key.")
+
+# genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
 @app.command()
 def ask(prompt: str):
@@ -298,6 +308,40 @@ Only include files that need to be changed. Do not include any explanations outs
                                     default=f"Refactor: {prompt[:50]}")
             if git_commit(commit_msg):
                 typer.echo("Changes committed successfully")
+
+@app.command()
+def setup():
+    """Configure your Gemini API key"""
+    api_key = typer.prompt("Enter your Gemini API key", hide_input=True)
+    
+    # Create .env file or update existing one
+    env_path = Path(".env")
+    
+    # Check if file exists and contains the API key
+    env_content = ""
+    if env_path.exists():
+        with open(env_path, "r") as f:
+            env_content = f.read()
+    
+    # Update or add the API key
+    if "GEMINI_API_KEY=" in env_content:
+        import re
+        env_content = re.sub(r"GEMINI_API_KEY=.*", f"GEMINI_API_KEY={api_key}", env_content)
+    else:
+        env_content += f"\nGEMINI_API_KEY={api_key}\n"
+    
+    # Write the updated content
+    with open(env_path, "w") as f:
+        f.write(env_content)
+    
+    typer.echo("API key configured successfully!")
+    
+    # Also store in global config
+    config = load_config()
+    config["api_key"] = api_key
+    save_config(config)
+    
+    typer.echo("You can now use the tool with your Gemini API key.")
 
 if __name__ == "__main__":
     app()

@@ -26,6 +26,40 @@ else:
 
 # genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
+
+@app.command()
+def help():
+    """Display all available commands and their descriptions"""
+    from rich.console import Console
+    from rich.table import Table
+    
+    console = Console()
+    
+    table = Table(title="Available Commands")
+    table.add_column("Command", style="cyan")
+    table.add_column("Description", style="green")
+    
+    # Add all commands with their help text
+    commands = [
+        ("ask", "Ask Gemini about your codebase"),
+        ("edit", "Edit a file based on natural language instructions"),
+        ("commit", "Create a git commit with the given message"),
+        ("config", "View or update configuration"),
+        ("interactive", "Start an interactive session with the AI assistant"),
+        ("history", "Show conversation history"),
+        ("generate_test", "Generate tests for a specific file"),
+        ("refactor", "Refactor code across multiple files based on instructions"),
+        ("setup", "Configure your Gemini API key"),
+        ("help", "Display all available commands and their descriptions")
+    ]
+    
+    for cmd, desc in commands:
+        table.add_row(cmd, desc)
+    
+    console.print(table)
+    console.print("\nFor more details on a specific command, run: admino [COMMAND] --help")
+
+
 @app.command()
 def ask(prompt: str):
     """Ask Gemini about your codebase"""

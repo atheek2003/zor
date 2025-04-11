@@ -46,31 +46,3 @@ def save_history_item(prompt: str, response: str):
     with open(history_path, "w") as f:
         json.dump(history, f, indent=2)
 
-# Add to open_code/main.py
-
-@app.command()
-def history(limit: int = 5):
-    """Show conversation history"""
-    from rich.console import Console
-    from rich.table import Table
-    
-    console = Console()
-    history = load_history(max_items=limit)
-    
-    if not history:
-        console.print("No history found")
-        return
-    
-    table = Table(title="Conversation History")
-    table.add_column("Date", style="cyan")
-    table.add_column("Prompt", style="green")
-    table.add_column("Response", style="yellow")
-    
-    for item in history[-limit:]:
-        # Truncate long text
-        prompt = item["prompt"][:50] + "..." if len(item["prompt"]) > 50 else item["prompt"]
-        response = item["response"][:50] + "..." if len(item["response"]) > 50 else item["response"]
-        
-        table.add_row(item["datetime"], prompt, response)
-    
-    console.print(table)

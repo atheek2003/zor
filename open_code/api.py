@@ -54,11 +54,11 @@ def generate_with_context(prompt: str, context: dict):
     response = model.generate_content(full_prompt)
     
     # Save to history
-    from .history import save_history_item
-    save_history_item(prompt, response.text)
+    try:
+        from .history import save_history_item
+        save_history_item(prompt, response.text)
+    except ImportError:
+        pass
     
     return response.text
 
-# Update in open_code/main.py - replace the generate_with_context function
-# with an import from the api module:
-# from .api import generate_with_context

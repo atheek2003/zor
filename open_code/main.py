@@ -41,7 +41,7 @@ def help():
     
     # Add all commands with their help text
     commands = [
-        ("ask", "Ask Gemini about your codebase"),
+        ("ask", "Ask Admino about your codebase"),
         ("edit", "Edit a file based on natural language instructions"),
         ("commit", "Create a git commit with the given message"),
         ("config", "View or update configuration"),

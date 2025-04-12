@@ -39,7 +39,6 @@ def help():
     table.add_column("Command", style="cyan")
     table.add_column("Description", style="green")
     
-    # Add all commands with their help text
     commands = [
         ("ask", "Ask Admino about your codebase"),
         ("edit", "Edit a file based on natural language instructions"),
@@ -72,7 +71,19 @@ def ask(prompt: str):
 #     """Edit a file based on natural language instructions"""
 #     context = get_codebase_context()
 #     instruction = f"Modify the file {file_path} to: {prompt}. Return only the complete new file content."
-#     new_content = generate_with_context(instruction, context)
+#     response = generate_with_context(instruction, context)
+#     
+#     # clean md res
+#     import re
+#     pattern = r"```(?:\w+)?\n(.*?)```"
+#     matches = re.findall(pattern, response, re.DOTALL)
+#     
+#     if matches:
+#         # Use the first code block found
+#         new_content = matches[0]
+#     else:
+#         # If no code block markers, use the response as is
+#         new_content = response
 #     
 #     if typer.confirm("Apply these changes?"):
 #         if edit_file(file_path, new_content):
@@ -83,11 +94,20 @@ def ask(prompt: str):
 @app.command()
 def edit(file_path: str, prompt: str):
     """Edit a file based on natural language instructions"""
+    # Check if file exists first
+    if not Path(file_path).exists():
+        typer.echo(f"Error: File {file_path} does not exist", err=True)
+        return
+        
+    # Get current content of the file
+    with open(file_path, "r") as f:
+        original_content = f.read()
+        
     context = get_codebase_context()
     instruction = f"Modify the file {file_path} to: {prompt}. Return only the complete new file content."
     response = generate_with_context(instruction, context)
     
-    # Clean up markdown code blocks
+    # Clean md res
     import re
     pattern = r"```(?:\w+)?\n(.*?)```"
     matches = re.findall(pattern, response, re.DOTALL)
@@ -99,8 +119,12 @@ def edit(file_path: str, prompt: str):
         # If no code block markers, use the response as is
         new_content = response
     
+    # Show diff to user BEFORE asking for confirmation
+    show_diff(original_content, new_content, file_path)
+    
+    # Now ask for confirmation
     if typer.confirm("Apply these changes?"):
-        if edit_file(file_path, new_content):
+        if edit_file(file_path, new_content, preview=False):  # Set preview=False to avoid showing diff twice
             typer.echo("File updated successfully")
         else:
             typer.echo("File update failed", err=True)

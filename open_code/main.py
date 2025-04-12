@@ -67,12 +67,37 @@ def ask(prompt: str):
     response = generate_with_context(prompt, context)
     print(response)
 
+# @app.command()
+# def edit(file_path: str, prompt: str):
+#     """Edit a file based on natural language instructions"""
+#     context = get_codebase_context()
+#     instruction = f"Modify the file {file_path} to: {prompt}. Return only the complete new file content."
+#     new_content = generate_with_context(instruction, context)
+#     
+#     if typer.confirm("Apply these changes?"):
+#         if edit_file(file_path, new_content):
+#             typer.echo("File updated successfully")
+#         else:
+#             typer.echo("File update failed", err=True)
+
 @app.command()
 def edit(file_path: str, prompt: str):
     """Edit a file based on natural language instructions"""
     context = get_codebase_context()
     instruction = f"Modify the file {file_path} to: {prompt}. Return only the complete new file content."
-    new_content = generate_with_context(instruction, context)
+    response = generate_with_context(instruction, context)
+    
+    # Clean up markdown code blocks
+    import re
+    pattern = r"```(?:\w+)?\n(.*?)```"
+    matches = re.findall(pattern, response, re.DOTALL)
+    
+    if matches:
+        # Use the first code block found
+        new_content = matches[0]
+    else:
+        # If no code block markers, use the response as is
+        new_content = response
     
     if typer.confirm("Apply these changes?"):
         if edit_file(file_path, new_content):

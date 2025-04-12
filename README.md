@@ -1,33 +1,33 @@
 ### Installation
 ```bash
-pip install -i https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple open-code
+pip install -i https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple zor
 ```
 
 ### Ask a question about your codebase
 ```bash
-admino ask "How do I implement rate limiting?"
+zor ask "How do I implement rate limiting?"
 ```
 
 ### Generate tests for a file
 ```bash
-admino generate-test open_code/api.py
+zor generate-test <file_name>.py
 ```
 
 ### Start an interactive session
 ```bash
-admino interactive
+zor interactive
 ```
 
 ### Edit a file using AI
 ```bash
-admino edit open_code/main.py "Add better error handling"
+zor edit <folder_name>/<file_name>.py "Add better error handling"
 ```
 ### View your configuration
 ```bash
-admino config
+zor config
 ```
 
 ### View your command history
 ```bash
-admino history
+zor history
 ```

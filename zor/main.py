@@ -39,7 +39,7 @@ def help():
     table.add_column("Description", style="green")
     
     commands = [
-        ("ask", "Ask Nebula about your codebase"),
+        ("ask", "Ask Zor about your codebase"),
         ("edit", "Edit a file based on natural language instructions"),
         ("commit", "Create a git commit with the given message"),
         ("config", "View or update configuration"),
@@ -55,7 +55,7 @@ def help():
         table.add_row(cmd, desc)
     
     console.print(table)
-    console.print("\nFor more details on a specific command, run: nebula [COMMAND] --help")
+    console.print("\nFor more details on a specific command, run: zor [COMMAND] --help")
 
 
 @app.command()

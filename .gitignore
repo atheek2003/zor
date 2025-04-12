@@ -1,5 +1,5 @@
 .env
-.nebula/
-nebula.egg-info
-nebula/__pycache__/
+.zor_env/
+zor.egg-info
+zor/__pycache__/
 dist/

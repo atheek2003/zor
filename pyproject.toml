@@ -3,7 +3,7 @@ requires = ["setuptools>=64", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "nebula"
+name = "zor"
 version = "0.0.1"
 description = "An Open-Source Claude Code like tool"
 authors = [{ name = "Hemanth", email = "arjunbanur27@gmail.com" }]
@@ -18,4 +18,4 @@ dependencies = [
 ]
 
 [project.scripts]
-nebula = "nebula.main:app"
+zor = "zor.main:app"

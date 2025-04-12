@@ -12,7 +12,6 @@ from typing import Optional
 
 app = typer.Typer()
 
-# Load API key from environment
 load_dotenv()
 
 api_key = os.getenv("GEMINI_API_KEY")
@@ -66,30 +65,6 @@ def ask(prompt: str):
     response = generate_with_context(prompt, context)
     print(response)
 
-# @app.command()
-# def edit(file_path: str, prompt: str):
-#     """Edit a file based on natural language instructions"""
-#     context = get_codebase_context()
-#     instruction = f"Modify the file {file_path} to: {prompt}. Return only the complete new file content."
-#     response = generate_with_context(instruction, context)
-#     
-#     # clean md res
-#     import re
-#     pattern = r"```(?:\w+)?\n(.*?)```"
-#     matches = re.findall(pattern, response, re.DOTALL)
-#     
-#     if matches:
-#         # Use the first code block found
-#         new_content = matches[0]
-#     else:
-#         # If no code block markers, use the response as is
-#         new_content = response
-#     
-#     if typer.confirm("Apply these changes?"):
-#         if edit_file(file_path, new_content):
-#             typer.echo("File updated successfully")
-#         else:
-#             typer.echo("File update failed", err=True)
 
 @app.command()
 def edit(file_path: str, prompt: str):
@@ -119,10 +94,9 @@ def edit(file_path: str, prompt: str):
         # If no code block markers, use the response as is
         new_content = response
     
-    # Show diff to user BEFORE asking for confirmation
+    # Show diff to user before confirmation
     show_diff(original_content, new_content, file_path)
     
-    # Now ask for confirmation
     if typer.confirm("Apply these changes?"):
         if edit_file(file_path, new_content, preview=False):  # Set preview=False to avoid showing diff twice
             typer.echo("File updated successfully")
@@ -156,9 +130,7 @@ def config(key: str = None, value: str = None):
         # Display specific key
         typer.echo(f"{key}: {current_config[key]}")
         return
-    
-    # Update config
-    # Convert value to appropriate type based on current value type
+
     current_type = type(current_config[key])
     if current_type == bool:
         current_config[key] = value.lower() in ("true", "1", "yes", "y")
@@ -187,11 +159,11 @@ def interactive():
     typer.echo("Starting interactive session. Type 'exit' to quit.")
     typer.echo("Loading codebase context...")
     
-    # Load context once at the beginning
+    # load context once at the start
     context = get_codebase_context()
     typer.echo(f"Loaded context from {len(context)} files.")
     
-    # Setup conversation history
+    # conversation history
     history = []
     
     while True:
@@ -201,10 +173,10 @@ def interactive():
             if prompt.lower() in ("exit", "quit"):
                 break
                 
-            # Add prompt to history
+            # add prompt to history
             history.append({"role": "user", "content": prompt})
             
-            # Create history string (simplified)
+            # create history string
             history_str = "\n".join(
                 f"{'User' if h['role'] == 'user' else 'Assistant'}: {h['content']}" 
                 for h in history[:-1]
@@ -215,7 +187,6 @@ def interactive():
             if history_str:
                 context_with_history["_conversation_history"] = history_str
             
-            # Get response with error handling and rate limiting
             try:
                 answer = generate_with_context(prompt, context_with_history)
                 typer.echo(f"\n{answer}")

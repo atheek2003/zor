@@ -10,7 +10,7 @@ DEFAULT_CONFIG = {
     "temperature": 0.2,
     "max_tokens": 8192,
     "exclude_dirs": ["node_modules", ".venv", "venv", ".git", "__pycache__", 
-                    "dist", "build", ".pytest_cache", ".next"],
+                    "dist", "build", ".pytest_cache", ".next", ".*"],
     "exclude_files": [".env", "*.pyc", "*.jpg", "*.png", "*.pdf"],
     "backup_files": True,
     "history_size": 10,
@@ -20,13 +20,13 @@ DEFAULT_CONFIG = {
 def get_config_path():
     """Get path to config file, prioritizing local then global config"""
     # Check for project-specific config
-    local_config = Path("./.ninjaconfig.json")
+    local_config = Path("./.codmino_config.json")
     if local_config.exists():
         return local_config
     
     # Fall back to global config
     home_dir = Path.home()
-    global_config = home_dir / ".config" / "ninja" / "config.json"
+    global_config = home_dir / ".config" / "codmino" / "config.json"
     return global_config
 
 def load_config():

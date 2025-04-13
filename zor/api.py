@@ -42,7 +42,7 @@ def exponential_backoff(max_retries=3):
 def generate_with_context(prompt: str, context: dict):
     """Generate a response with codebase context with rate limiting"""
     config = load_config()
-    model_name = config.get("model", "gemini-1.5-flash")
+    model_name = config.get("model", "gemini-2.0-flash")
     temperature = config.get("temperature", 0.2)
     
     model = genai.GenerativeModel(model_name, 

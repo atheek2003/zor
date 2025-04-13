@@ -3,6 +3,12 @@
 pip install -i https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple zor
 ```
 
+#### Setup
+```bash
+zor setup
+```
+Paste your Gemini API key when prompted. You can get your API key from [Gemini](https://ai.google.dev/gemini-api/docs/api-key).
+
 #### To see all the available commands and user manual
 ```bash
 zor help

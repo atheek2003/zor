@@ -43,7 +43,7 @@ def help():
         ("ask", "Ask Zor about your codebase"),
         ("edit", "Edit a file based on natural language instructions"),
         ("commit", "Create a git commit with the given message"),
-        ("config", "View or update configuration"),
+        ("config", "View configuration"),
         ("interactive", "Start an interactive session with the Zor AI assistant"),
         ("history", "Show conversation history"),
         ("generate_test", "Generate tests for a specific file"),

@@ -245,6 +245,10 @@ def history(limit: int = 5):
 @app.command()
 def generate_test(file_path: str, test_framework: str = "pytest"):
     """Generate tests for a specific file"""
+    if not Path(file_path).exists():
+        typer.echo(f"Error: File {file_path} does not exist", err=True)
+        return
+
     context = get_codebase_context()
     
     # Read the target file
@@ -268,10 +272,30 @@ Existing codebase context is available for reference."""
     
     # Determine test file path
     test_file_path = str(Path(file_path).parent / f"test_{Path(file_path).name}")
+
+    # clean
+    code_blocks = extract_code_blocks(tests)
+
+    if code_blocks:
+        test_code = code_blocks[0]
+    else:
+        test_code = tests
     
-    # Show the generated tests
-    typer.echo("\nGenerated tests:")
-    typer.echo(tests)
+    from rich.console import Console
+    from rich.syntax import Syntax
+    
+    console = Console()
+    console.print("\nGenerated test:")
+    syntax = Syntax(test_code, "python", theme="monokai", line_numbers=True)
+    console.print(syntax)
+    
+    # if test exists -> show diff
+    if Path(test_file_path).exists():
+        with open(test_file_path, "r") as f:
+            existing_test_code = f.read()
+        show_diff(existing_test_code, test_code, test_file_path)
+    else:
+        typer.echo(f"Note: Creating new test file at {test_file_path}")
     
     # Ask to save
     if typer.confirm(f"Save tests to {test_file_path}?"):

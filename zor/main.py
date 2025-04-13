@@ -444,7 +444,7 @@ def setup():
         genai.configure(api_key=api_key)
         
         # Try a simple API call to validate the key
-        model = genai.GenerativeModel("gemini-1.0-pro")
+        model = genai.GenerativeModel("gemini-2.0-flash")
         response = model.generate_content("Just respond with 'OK' if this API key is valid.")
         
         if not response or not hasattr(response, 'text') or "error" in response.text.lower():
@@ -471,7 +471,7 @@ def setup():
         import re
         env_content = re.sub(r"GEMINI_API_KEY=.*", f"GEMINI_API_KEY={api_key}", env_content)
     else:
-        env_content += f"\nGEMINI_API_KEY="{api_key}"\n"
+        env_content += f"\nGEMINI_API_KEY={api_key}\n"
     
     # Write the updated content
     try:

@@ -22,7 +22,7 @@ if not api_key:
 if api_key:
     genai.configure(api_key=api_key)
 else:
-    typer.echo("No Gemini API key found. Run 'admino setup' to configure your API key.")
+    typer.echo("No Gemini API key found. Run 'zor setup' to configure your API key.")
 
 # genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 

@@ -7,7 +7,7 @@ from typing import List, Dict
 def get_history_path():
     """Get path to history file"""
     home_dir = Path.home()
-    history_dir = home_dir / ".config" / "ninja" / "history"
+    history_dir = home_dir / ".config" / "zor" / "history"
     history_dir.mkdir(parents=True, exist_ok=True)
     return history_dir / "history.json"
 

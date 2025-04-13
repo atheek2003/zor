@@ -9,6 +9,7 @@ from .git_utils import git_commit
 from .api import generate_with_context
 from .config import load_config, save_config
 from typing import Optional
+from typer.core import TyperGroup
 
 app = typer.Typer()
 
@@ -43,7 +44,7 @@ def help():
         ("edit", "Edit a file based on natural language instructions"),
         ("commit", "Create a git commit with the given message"),
         ("config", "View or update configuration"),
-        ("interactive", "Start an interactive session with the AI assistant"),
+        ("interactive", "Start an interactive session with the Zor AI assistant"),
         ("history", "Show conversation history"),
         ("generate_test", "Generate tests for a specific file"),
         ("refactor", "Refactor code across multiple files based on instructions"),
@@ -161,7 +162,7 @@ def interactive():
     
     # load context once at the start
     context = get_codebase_context()
-    typer.echo(f"Loaded context from {len(context)} files.")
+    typer.echo(f"Loaded context : {len(context)} tokens")
     
     # conversation history
     history = []

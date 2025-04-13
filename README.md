@@ -1,33 +1,45 @@
-### Installation
+#### Installation
 ```bash
 pip install -i https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple zor
 ```
 
-### Ask a question about your codebase
+#### To see all the available commands and user manual
+```bash
+zor help
+```
+
+#### To see manual or detailed information about a specific command
+```bash
+zor <command_name> --help
+```
+
+## Some examples of using Zor
+
+#### Ask a question about your codebase
 ```bash
 zor ask "How do I implement rate limiting?"
 ```
 
-### Generate tests for a file
+#### Generate tests for a file
 ```bash
 zor generate-test <file_name>.py
 ```
 
-### Start an interactive session
+#### Start an interactive session
 ```bash
 zor interactive
 ```
 
-### Edit a file using AI
+#### Edit a file using AI
 ```bash
 zor edit <folder_name>/<file_name>.py "Add better error handling"
 ```
-### View your configuration
+#### View your configuration
 ```bash
 zor config
 ```
 
-### View your command history
+#### View your command history
 ```bash
 zor history
 ```

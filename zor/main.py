@@ -388,10 +388,74 @@ Only include files that need to be changed. Do not include any explanations outs
             if git_commit(commit_msg):
                 typer.echo("Changes committed successfully")
 
+# @app.command()
+# def setup():
+#     """Configure your Gemini API key"""
+#     api_key = typer.prompt("Enter your Gemini API key", hide_input=True)
+#     
+#     # Create .env file or update existing one
+#     env_path = Path(".env")
+#     
+#     # Check if file exists and contains the API key
+#     env_content = ""
+#     if env_path.exists():
+#         with open(env_path, "r") as f:
+#             env_content = f.read()
+#     
+#     # Update or add the API key
+#     if "GEMINI_API_KEY=" in env_content:
+#         import re
+#         env_content = re.sub(r"GEMINI_API_KEY=.*", f"GEMINI_API_KEY={api_key}", env_content)
+#     else:
+#         env_content += f"\nGEMINI_API_KEY={api_key}\n"
+#     
+#     # Write the updated content
+#     with open(env_path, "w") as f:
+#         f.write(env_content)
+#     
+#     typer.echo("API key configured successfully!")
+#     
+#     # Also store in global config
+#     config = load_config()
+#     config["api_key"] = api_key
+#     save_config(config)
+#     
+#     typer.echo("You can now use the tool with your Gemini API key.")
+
+
 @app.command()
 def setup():
     """Configure your Gemini API key"""
+    config = load_config()
+    current_api_key = config.get("api_key")
+    
+    # Check if API key already exists
+    if current_api_key:
+        if not typer.confirm("An API key is already configured. Do you want to replace it?", default=False):
+            typer.echo("Setup cancelled. Keeping existing API key.")
+            return
+
     api_key = typer.prompt("Enter your Gemini API key", hide_input=True)
+    
+    # Validate API key
+    typer.echo("Validating API key...")
+    try:
+        # Configure temporarily with the new key
+        genai.configure(api_key=api_key)
+        
+        # Try a simple API call to validate the key
+        model = genai.GenerativeModel("gemini-1.0-pro")
+        response = model.generate_content("Just respond with 'OK' if this API key is valid.")
+        
+        if not response or not hasattr(response, 'text') or "error" in response.text.lower():
+            typer.echo("Error: The API key appears to be invalid.", err=True)
+            return
+            
+        typer.echo("API key validated successfully!")
+    except Exception as e:
+        typer.echo(f"Error: Unable to validate API key: {str(e)}", err=True)
+        if not typer.confirm("The API key could not be validated. Save it anyway?", default=False):
+            return
     
     # Create .env file or update existing one
     env_path = Path(".env")
@@ -407,20 +471,25 @@ def setup():
         import re
         env_content = re.sub(r"GEMINI_API_KEY=.*", f"GEMINI_API_KEY={api_key}", env_content)
     else:
-        env_content += f"\nGEMINI_API_KEY={api_key}\n"
+        env_content += f"\nGEMINI_API_KEY="{api_key}"\n"
     
     # Write the updated content
-    with open(env_path, "w") as f:
-        f.write(env_content)
-    
-    typer.echo("API key configured successfully!")
-    
-    # Also store in global config
-    config = load_config()
-    config["api_key"] = api_key
-    save_config(config)
-    
-    typer.echo("You can now use the tool with your Gemini API key.")
+    try:
+        with open(env_path, "w") as f:
+            f.write(env_content)
+        
+        # Also store in global config
+        config["api_key"] = api_key
+        save_config(config)
+        
+        # Update the current session's API key
+        genai.configure(api_key=api_key)
+        
+        typer.echo("API key configured and saved successfully!")
+        typer.echo("You can now use zor with your Gemini API key.")
+    except Exception as e:
+        typer.echo(f"Error saving API key: {str(e)}", err=True)
+
 
 if __name__ == "__main__":
     app()

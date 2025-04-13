@@ -20,13 +20,13 @@ DEFAULT_CONFIG = {
 def get_config_path():
     """Get path to config file, prioritizing local then global config"""
     # Check for project-specific config
-    local_config = Path("./.codmino_config.json")
+    local_config = Path("./.zor_config.json")
     if local_config.exists():
         return local_config
     
     # Fall back to global config
     home_dir = Path.home()
-    global_config = home_dir / ".config" / "codmino" / "config.json"
+    global_config = home_dir / ".config" / "zor" / "config.json"
     return global_config
 
 def load_config():

@@ -8,61 +8,24 @@ from .file_ops import edit_file, show_diff
 from .git_utils import git_commit
 from .api import generate_with_context
 from .config import load_config, save_config
-from typing import Optional, Annotated, Callable
-from functools import wraps
+from typing import Optional
 from typer.core import TyperGroup
 
 app = typer.Typer()
 
 load_dotenv()
 
-# Global flag to track if API key is validated
-api_key_valid = False
+api_key = os.getenv("GEMINI_API_KEY")
+if not api_key:
+    config = load_config()
+    api_key = config.get("api_key")
+if api_key:
+    genai.configure(api_key=api_key)
+else:
+    typer.echo("No Gemini API key found. Run 'zor setup' to configure your API key.")
 
-# Load API key from environment or config
-def load_api_key():
-    global api_key_valid
-    
-    api_key = os.getenv("GEMINI_API_KEY")
-    if not api_key:
-        config = load_config()
-        api_key = config.get("api_key")
-    
-    if api_key:
-        try:
-            genai.configure(api_key=api_key)
-            # Quick validation attempt - keep this lightweight
-            model = genai.GenerativeModel("gemini-2.0-flash")
-            response = model.generate_content("Test")
-            api_key_valid = True
-            return True
-        except Exception:
-            api_key_valid = False
-            return False
-    
-    api_key_valid = False
-    return False
+# genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
-# Try to load API key on startup
-load_api_key()
-
-# Decorator to ensure API key exists before running commands
-def require_api_key(func):
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        global api_key_valid
-        
-        # Skip API key check for setup command
-        if func.__name__ == "setup":
-            return func(*args, **kwargs)
-        
-        # Check if API key is valid
-        if not api_key_valid:
-            typer.echo("No valid Gemini API key found. Please run 'zor setup' to configure your API key.", err=True)
-            raise typer.Exit(1)
-            
-        return func(*args, **kwargs)
-    return wrapper
 
 @app.command()
 def help():
@@ -95,12 +58,8 @@ def help():
     console.print(table)
     console.print("\nFor more details on a specific command, run: zor [COMMAND] --help")
 
-    if not api_key_valid:
-        console.print("\n[bold red]Warning:[/bold red] No valid API key configured. Please run 'zor setup' first.", style="red")
-
 
 @app.command()
-@require_api_key
 def ask(prompt: str):
     """Ask Gemini about your codebase"""
     context = get_codebase_context()
@@ -109,7 +68,6 @@ def ask(prompt: str):
 
 
 @app.command()
-@require_api_key
 def edit(file_path: str, prompt: str):
     """Edit a file based on natural language instructions"""
     # Check if file exists first
@@ -147,7 +105,6 @@ def edit(file_path: str, prompt: str):
             typer.echo("File update failed", err=True)
 
 @app.command()
-@require_api_key
 def commit(message: str):
     """Create a git commit with the given message"""
     if git_commit(message):
@@ -163,15 +120,7 @@ def config(key: str = None, value: str = None):
     if key is None and value is None:
         # Display current config
         for k, v in current_config.items():
-            if k == "api_key" and v:
-                # Don't show the actual API key, just indicate if it exists
-                typer.echo(f"{k}: ***** (configured)")
-            else:
-                typer.echo(f"{k}: {v}")
-                
-        # Show API key status
-        if not api_key_valid:
-            typer.echo("\nWarning: No valid API key configured. Please run 'zor setup'.", err=True)
+            typer.echo(f"{k}: {v}")
         return
     
     if key not in current_config:
@@ -180,10 +129,7 @@ def config(key: str = None, value: str = None):
     
     if value is None:
         # Display specific key
-        if key == "api_key" and current_config[key]:
-            typer.echo(f"{key}: ***** (configured)")
-        else:
-            typer.echo(f"{key}: {current_config[key]}")
+        typer.echo(f"{key}: {current_config[key]}")
         return
 
     current_type = type(current_config[key])
@@ -209,7 +155,6 @@ def extract_code_blocks(text):
     return matches
 
 @app.command()
-@require_api_key
 def interactive():
     """Start an interactive session with the AI assistant"""
     typer.echo("Starting interactive session. Type 'exit' to quit.")
@@ -270,7 +215,6 @@ def interactive():
     typer.echo("Interactive session ended.")
 
 @app.command()
-@require_api_key
 def history(limit: int = 5):
     """Show conversation history"""
     from rich.console import Console
@@ -299,7 +243,6 @@ def history(limit: int = 5):
     console.print(table)
 
 @app.command()
-@require_api_key
 def generate_test(file_path: str, test_framework: str = "pytest"):
     """Generate tests for a specific file"""
     if not Path(file_path).exists():
@@ -361,7 +304,6 @@ Existing codebase context is available for reference."""
         typer.echo(f"Tests saved to {test_file_path}")
 
 @app.command()
-@require_api_key
 def refactor(prompt: str):
     """Refactor code across multiple files based on instructions"""
     context = get_codebase_context()
@@ -449,8 +391,6 @@ Only include files that need to be changed. Do not include any explanations outs
 @app.command()
 def setup():
     """Configure your Gemini API key"""
-    global api_key_valid
-    
     config = load_config()
     current_api_key = config.get("api_key")
     
@@ -477,7 +417,6 @@ def setup():
             return
             
         typer.echo("API key validated successfully!")
-        api_key_valid = True
     except Exception as e:
         typer.echo(f"Error: Unable to validate API key: {str(e)}", err=True)
         if not typer.confirm("The API key could not be validated. Save it anyway?", default=False):

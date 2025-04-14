@@ -4,3 +4,4 @@ zor.egg-info
 zor/__pycache__/
 dist/
 tests/__pycache__/
+run_tests.sh

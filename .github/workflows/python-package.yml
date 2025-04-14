@@ -27,9 +27,14 @@ jobs:
         python -m pip install pytest
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
         pip install -e .
+    - name: Clean test artifacts
+      run: |
+        find . -type d -name "__pycache__" -exec rm -rf {} +
+        rm -rf .pytest_cache
+        rm -rf src/zor/tests
     - name: Test with pytest
       run: |
-        pytest
+        pytest tests/ -v
 
   build-and-publish:
     needs: test

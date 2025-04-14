@@ -4,18 +4,41 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "zor"
-version = "0.0.6"
+version = "0.0.1"
 description = "An Open-Source Claude Code like tool"
 authors = [{ name = "Hemanth", email = "arjunbanur27@gmail.com" }]
 readme = "README.md"
 license = { file = "LICENSE" }
-dependencies = [
-    "google-generativeai",
-    "python-dotenv",
-    "typer",
-    "rich",
-    "pygments"
+requires-python = ">=3.7"
+keywords = ["ai", "code", "assistant", "gemini", "development"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13"
 ]
+dependencies = [
+    "google-generativeai==0.8.4",
+    "python-dotenv==1.1.0",
+    "typer==0.15.2",
+    "rich==14.0.0",
+    "pygments==2.19.1",
+    "tqdm==4.67.1"
+]
+
+[project.urls]
+"Homepage" = "https://github.com/arjuuuuuunnnnn/zor"
+"Bug Tracker" = "https://github.com/arjuuuuuunnnnn/zor/issues"
 
 [project.scripts]
 zor = "zor.main:app"
+
+[tool.setuptools]
+packages = ["zor"]

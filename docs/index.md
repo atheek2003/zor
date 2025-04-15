@@ -5,7 +5,7 @@
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
 <div align="center">
-  <img src="/api/placeholder/600/300" alt="Zor Logo" />
+  <img src="assets/card.jpg" alt="Zor Logo" width="150" height="75"/>
   <p><i>Powerful AI assistance for your codebase</i></p>
 </div>
 

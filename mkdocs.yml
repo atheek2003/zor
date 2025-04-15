@@ -1,4 +1,14 @@
 site_name: Zor
 nav:
   - Home: index.md
-  - Guide: guide.md 
+  - Guide: guide.md
+
+theme:
+  name: material
+site_dir: site
+
+plugins:
+  - search
+markdown_extensions:
+  - toc:
+      permalink: true

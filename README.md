@@ -1,7 +1,7 @@
 # Zor
 
 <div align="center">
-  <img src="assets/card.jpg" alt="Zor Logo" width="100" height="50" />
+  <img src="assets/card.jpg" alt="Zor Logo" width="150" height="75" />
   <p><i>An Open-Source Claude Code-like Tool</i></p>
   
   [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)

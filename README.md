@@ -24,7 +24,7 @@ Think of it as an open-source alternative to tools like Claude Code - your AI pa
 - 🧪 **Generate Tests**: Automatically create tests for your code
 - 🔄 **Refactor Code**: Implement complex changes across multiple files
 - 🔧 **Git Integration**: Commit changes directly from Zor
-- 🧠 **Project Creation**: Create new projects with description provided
+- 🧠 **Project Creation**: Create a new projects with description provided
 
 ## Installation
 

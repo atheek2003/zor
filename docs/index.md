@@ -74,7 +74,7 @@ pip install -e .
 | Command | Description |
 |---------|-------------|
 | `zor ask` | Ask about your codebase |
-| `zor init` | Warns before overwriting existing directories |
+| `zor init` | Create a new project with Zor |
 | `zor edit` | Edit a file with natural language |
 | `zor commit` | Create a git commit |
 | `zor interactive` | Start an interactive session |

@@ -575,6 +575,7 @@ def init(prompt: str, directory: str = None):
         5. Dependencies that would need to be installed
         6. Development environment recommendations
         7. Any best practices specific to this type of project
+        8. For any framework, specify the official scaffolding command that would initialize the project
         
         Format the response as:
         
@@ -583,6 +584,10 @@ def init(prompt: str, directory: str = None):
         MAIN_TECHNOLOGIES: [comma-separated list of main technologies]
         
         ARCHITECTURE: [Brief description of recommended architecture]
+        
+        SCAFFOLD_COMMAND: [Official scaffolding command if applicable, or NONE if not applicable]
+        
+        SCAFFOLD_TYPE: [One of: CREATES_OWN_DIR, NEEDS_EMPTY_DIR, IN_PLACE, or NONE. Indicates how the scaffolding tool behaves]
         
         PROJECT_PLAN:
         [Detailed explanation of the project structure and components]
@@ -598,6 +603,30 @@ def init(prompt: str, directory: str = None):
         
         DEVELOPMENT_RECOMMENDATIONS:
         [Recommendations for development environment and workflows]
+        
+        For SCAFFOLD_COMMAND, provide the exact command that should be run to initialize the project with the official tooling.
+        Examples:
+        - For React: npx create-react-app my-app
+        - For Vue: npm init vue@latest my-app
+        - For Angular: ng new my-app
+        - For Next.js: npx create-next-app my-app
+        - For Express: npx express-generator my-app
+        - For Django: django-admin startproject myproject
+        - For Spring Boot: spring init --dependencies=web,data-jpa my-project
+        - For Flutter: flutter create my_app
+        - For Rails: rails new my_app
+        - For .NET Core: dotnet new webapp -o MyApp
+        - For Gatsby: npx gatsby new my-site
+        - For Svelte: npm create svelte@latest my-app
+        - For Electron: npx create-electron-app my-app
+        - For NestJS: nest new my-nest-app
+        - For Laravel: composer create-project laravel/laravel my-app
+        
+        For SCAFFOLD_TYPE, specify how the scaffold command behaves:
+        - CREATES_OWN_DIR: The command creates its own directory (like create-react-app my-app)
+        - NEEDS_EMPTY_DIR: The command needs to be run inside an empty directory
+        - IN_PLACE: The command adds files to the current directory structure
+        - NONE: No scaffolding command is needed or available
         """
         
         status.update("[bold green]Generating project blueprint...")
@@ -605,12 +634,18 @@ def init(prompt: str, directory: str = None):
         
         # Parse the response to extract project information
         import re
+        import shlex
+        import subprocess
+        import sys
+        import os
         
         # Extract all sections with improved regex patterns
         sections = {
             "project_type": re.search(r"PROJECT_TYPE:\s*(.*?)(?:\n\s*\n|\n\s*[A-Z_]+:)", plan_response + "\n\n", re.DOTALL),
             "main_technologies": re.search(r"MAIN_TECHNOLOGIES:\s*(.*?)(?:\n\s*\n|\n\s*[A-Z_]+:)", plan_response + "\n\n", re.DOTALL),
             "architecture": re.search(r"ARCHITECTURE:\s*(.*?)(?:\n\s*\n|\n\s*[A-Z_]+:)", plan_response + "\n\n", re.DOTALL),
+            "scaffold_command": re.search(r"SCAFFOLD_COMMAND:\s*(.*?)(?:\n\s*\n|\n\s*[A-Z_]+:)", plan_response + "\n\n", re.DOTALL),
+            "scaffold_type": re.search(r"SCAFFOLD_TYPE:\s*(.*?)(?:\n\s*\n|\n\s*[A-Z_]+:)", plan_response + "\n\n", re.DOTALL),
             "dependencies": re.search(r"DEPENDENCIES:(.*?)(?:\n\s*\n|\n\s*[A-Z_]+:)", plan_response + "\n\n", re.DOTALL),
             "setup_commands": re.search(r"SETUP_COMMANDS:(.*?)(?:\n\s*\n|\n\s*[A-Z_]+:)", plan_response + "\n\n", re.DOTALL),
             "development_recommendations": re.search(r"DEVELOPMENT_RECOMMENDATIONS:(.*?)(?:\n\s*\n|\n\s*[A-Z_]+:|$)", plan_response + "\n\n", re.DOTALL)
@@ -621,9 +656,11 @@ def init(prompt: str, directory: str = None):
         for key, match in sections.items():
             project_info[key] = match.group(1).strip() if match else "Not specified"
         
-        # Get project type with fallback
+        # Get project information with fallbacks
         project_type = project_info.get("project_type", "Unknown")
         setup_commands = project_info.get("setup_commands", "")
+        scaffold_command = project_info.get("scaffold_command", "NONE")
+        scaffold_type = project_info.get("scaffold_type", "NONE").upper()
         
         # Show the project plan to the user with improved formatting
         status.stop()
@@ -647,13 +684,170 @@ def init(prompt: str, directory: str = None):
             typer.echo("Project initialization cancelled.")
             raise typer.Exit()
         
-        # Improved file generation prompt with more context
+        # Check if we need to run a scaffold command
+        if scaffold_command and scaffold_command.lower() != "none":
+            # Framework-specific adjustments
+            # Extract the command base (e.g., "npx create-react-app" from "npx create-react-app my-app")
+            command_parts = shlex.split(scaffold_command)
+            project_name_placeholder = "{project_name}"
+            project_path_placeholder = "{project_dir}"
+            
+            # Prepare the command with the actual project name/directory
+            if project_name_placeholder in scaffold_command:
+                scaffold_command = scaffold_command.replace(project_name_placeholder, project_dir.name)
+            elif project_path_placeholder in scaffold_command:
+                scaffold_command = scaffold_command.replace(project_path_placeholder, str(project_dir))
+            else:
+                # If no placeholder is used, we need to determine how to handle the project name/path
+                # based on the scaffold type and the specific framework
+                if scaffold_type == "CREATES_OWN_DIR":
+                    # Check if the command already has a project name/path at the end
+                    has_project_arg = False
+                    for part in command_parts[1:]:  # Skip the executable
+                        if not part.startswith("-") and "/" not in part and "=" not in part:
+                            has_project_arg = True
+                            break
+                    
+                    if not has_project_arg:
+                        scaffold_command = f"{scaffold_command} {project_dir.name}"
+                elif scaffold_type == "NEEDS_EMPTY_DIR" or scaffold_type == "IN_PLACE":
+                    # No adjustment needed - will run in the project directory
+                    pass
+            
+            # Ask user permission to run the scaffold command
+            console.print(f"\n[bold]Official scaffolding command detected:[/bold]")
+            console.print(f"[green]{scaffold_command}[/green]")
+            console.print(f"Scaffold type: [cyan]{scaffold_type}[/cyan]")
+            
+            if typer.confirm("\nRun this scaffolding command?", default=True):
+                console.print("\n[bold green]Executing scaffolding command...[/bold green]")
+                
+                # Determine working directory and handle directory creation
+                if scaffold_type == "CREATES_OWN_DIR":
+                    # Execute in parent directory if command creates its own directory
+                    working_dir = project_dir.parent
+                    
+                    # Check if we need to remove existing directory for clean scaffold
+                    if project_dir.exists() and any(project_dir.iterdir()):
+                        if typer.confirm(f"Directory {project_dir} exists. Remove it for clean scaffolding?", default=False):
+                            import shutil
+                            try:
+                                shutil.rmtree(project_dir)
+                                console.print(f"[bold]Removed existing directory: {project_dir}[/bold]")
+                            except Exception as e:
+                                console.print(f"[bold red]Error removing directory: {str(e)}[/bold red]")
+                                if not typer.confirm("Continue anyway?", default=False):
+                                    typer.echo("Project initialization cancelled.")
+                                    raise typer.Exit()
+                elif scaffold_type == "NEEDS_EMPTY_DIR":
+                    # Execute in the project directory, but ensure it's empty
+                    working_dir = project_dir
+                    
+                    # Check if directory is empty
+                    if any(project_dir.iterdir()):
+                        if typer.confirm(f"Directory {project_dir} is not empty. Clear it for scaffolding?", default=False):
+                            import shutil
+                            try:
+                                # Remove all contents but keep the directory
+                                for item in project_dir.iterdir():
+                                    if item.is_dir():
+                                        shutil.rmtree(item)
+                                    else:
+                                        item.unlink()
+                                console.print(f"[bold]Cleared directory contents: {project_dir}[/bold]")
+                            except Exception as e:
+                                console.print(f"[bold red]Error clearing directory: {str(e)}[/bold red]")
+                                if not typer.confirm("Continue anyway?", default=False):
+                                    typer.echo("Project initialization cancelled.")
+                                    raise typer.Exit()
+                else:  # IN_PLACE or default
+                    # Execute in the project directory
+                    working_dir = project_dir
+                
+                try:
+                    # Handle platform-specific command execution
+                    shell = False
+                    if sys.platform == "win32":
+                        shell = True
+                        # On Windows, use shell=True for npm/npx commands
+                        process = subprocess.run(
+                            scaffold_command,
+                            cwd=working_dir,
+                            capture_output=True,
+                            text=True,
+                            shell=shell
+                        )
+                    else:
+                        # Split the command properly using shlex for Unix-like systems
+                        command_args = shlex.split(scaffold_command)
+                        process = subprocess.run(
+                            command_args,
+                            cwd=working_dir,
+                            capture_output=True,
+                            text=True,
+                            shell=shell
+                        )
+                    
+                    if process.returncode == 0:
+                        console.print(f"[bold green]Scaffolding completed successfully![/bold green]")
+                        console.print(process.stdout)
+                    else:
+                        console.print(f"[bold red]Scaffolding command failed with code {process.returncode}[/bold red]")
+                        console.print(f"Error: {process.stderr}")
+                        
+                        # Ask if user wants to continue with file generation even though scaffolding failed
+                        if not typer.confirm("Continue with file generation anyway?", default=False):
+                            typer.echo("Project initialization cancelled.")
+                            raise typer.Exit()
+                except Exception as e:
+                    console.print(f"[bold red]Error executing scaffolding command: {str(e)}[/bold red]")
+                    
+                    # Ask if user wants to continue with file generation despite the error
+                    if not typer.confirm("Continue with file generation anyway?", default=False):
+                        typer.echo("Project initialization cancelled.")
+                        raise typer.Exit()
+                
+                # Update project directory if necessary - handle various scaffolding behaviors
+                if scaffold_type == "CREATES_OWN_DIR":
+                    # Check various common patterns for project directory creation
+                    potential_dirs = [
+                        project_dir,  # Original expected location
+                        project_dir.parent / project_dir.name.lower(),  # Lowercase version
+                        project_dir.parent / project_dir.name.replace("-", "_"),  # Python style
+                        project_dir.parent / project_dir.name.replace("_", "-")   # JS style
+                    ]
+                    
+                    # Look for standard variations of the project name that might have been created
+                    for potential_dir in potential_dirs:
+                        if potential_dir.exists() and potential_dir != project_dir:
+                            console.print(f"[bold yellow]Project was created at: {potential_dir}[/bold yellow]")
+                            if typer.confirm(f"Use this directory instead of {project_dir}?", default=True):
+                                project_dir = potential_dir
+                                break
+                    
+                    # If we still don't have a valid directory, ask the user
+                    if not project_dir.exists():
+                        console.print(f"[bold red]Expected project directory {project_dir} was not created.[/bold red]")
+                        # Allow user to specify where the project was created
+                        new_dir = typer.prompt("Please enter the path where the project was created:")
+                        potential_dir = Path(new_dir)
+                        if potential_dir.exists():
+                            project_dir = potential_dir
+                        else:
+                            console.print(f"[bold red]Directory {potential_dir} does not exist.[/bold red]")
+                            if not typer.confirm("Continue with file generation anyway?", default=False):
+                                typer.echo("Project initialization cancelled.")
+                                raise typer.Exit()
+        
+        # Improved file generation prompt with more context - now considers scaffolded files
         file_generation_prompt = f"""
         Based on the project description: "{prompt}"
         
         And identified project type: {project_type}
         
-        Generate the content for each key file in the project. For each file, provide:
+        {"A scaffolding command was executed to set up the basic project structure using the official tools for this framework/language." if scaffold_command and scaffold_command.lower() != "none" else "No scaffolding command was executed. You need to provide all necessary files for a complete project."}
+        
+        Generate the content for {"additional" if scaffold_command and scaffold_command.lower() != "none" else ""} key files needed in the project. For each file, provide:
         1. The file path relative to the project root
         2. The complete content of the file
         3. A brief comment at the top of each file explaining its purpose
@@ -673,23 +867,35 @@ def init(prompt: str, directory: str = None):
         ```
         
         IMPORTANT GUIDELINES:
+        - {"If scaffolding was executed, focus on customizing and extending the scaffolded project. Do not recreate files that are typically generated by the scaffolding tool." if scaffold_command and scaffold_command.lower() != "none" else "Provide a complete set of files for a functioning project."}
         - Always include a comprehensive README.md with:
           * Project description and features
           * Setup instructions (installation, configuration)
           * Usage examples with code snippets
           * API documentation if applicable
           * Contribution guidelines
-        - Include appropriate configuration files (.gitignore, package.json, requirements.txt, etc.)
+        - Include appropriate configuration files (.gitignore, package.json, requirements.txt, etc.) if not already created by scaffolding
         - Provide complete, functional code for each file (no placeholders or TODOs)
-        - For React or web projects, include necessary HTML, CSS, and JS files
-        - For Python projects, include appropriate requirements.txt and setup files
-        - Ensure code follows best practices and style conventions for the language
+        - Ensure code follows best practices and style conventions for the language/framework
         - Add appropriate comments and documentation in the code
         - Include unit tests where appropriate
+        
+        For specific frameworks, ensure you include:
+        - React: Component files, styling, routing if needed
+        - Angular: Modules, components, services
+        - Vue: Components, views, router setup
+        - Node.js: Controllers, models, routes
+        - Python: Modules, packages, tests
+        - Django: Models, views, templates, URLs
+        - Flask: Routes, templates, forms
+        - Spring Boot: Controllers, services, repositories
+        - Laravel: Controllers, models, migrations, views
+        - .NET: Controllers, models, views
+        - Flutter: Widgets, services, state management
         """
         
         # Generate file contents
-        with console.status("[bold green]Generating project files...", spinner="dots") as status:
+        with console.status("[bold green]Generating additional project files...", spinner="dots") as status:
             files_response = generate_with_context(file_generation_prompt, context)
             status.stop()
             
@@ -702,13 +908,31 @@ def init(prompt: str, directory: str = None):
             raise typer.Exit(1)
         
         # Create the files with improved error handling and reporting
-        console.print(Panel.fit(f"Creating {len(file_matches)} files...", title="File Creation"))
+        console.print(Panel.fit(f"Creating {len(file_matches)} additional files...", title="File Creation"))
         
         created_files = []
         failed_files = []
+        skipped_files = []
         
         for file_path, content in file_matches:
             full_path = project_dir / file_path.strip()
+            
+            # Check if file already exists (might have been created by scaffolding)
+            if full_path.exists():
+                # Ask if user wants to overwrite existing files
+                if typer.confirm(f"File {file_path} already exists. Overwrite?", default=False):
+                    try:
+                        with open(full_path, "w") as f:
+                            f.write(content)
+                        created_files.append(str(full_path))
+                        console.print(f"Overwritten: [blue]{file_path}[/blue]")
+                    except Exception as e:
+                        failed_files.append((file_path, str(e)))
+                        console.print(f"Error overwriting {file_path}: {str(e)}", style="bold red")
+                else:
+                    console.print(f"Skipped (already exists): [yellow]{file_path}[/yellow]")
+                    skipped_files.append(str(full_path))
+                continue
             
             # Create directories if they don't exist
             try:
@@ -723,7 +947,7 @@ def init(prompt: str, directory: str = None):
                 failed_files.append((file_path, str(e)))
                 console.print(f"Error creating {file_path}: {str(e)}", style="bold red")
         
-        # Always display setup commands (but don't execute them)
+        # Always display setup commands (but don't execute them yet)
         console.print("\n[bold]Setup Commands (for reference):[/bold]")
         if setup_commands and setup_commands != "Not specified":
             console.print(setup_commands)
@@ -735,20 +959,168 @@ def init(prompt: str, directory: str = None):
             console.print("\n[bold]Development Recommendations:[/bold]")
             console.print(project_info.get("development_recommendations"))
         
+        # Ask if user wants to execute setup commands
+        if setup_commands and setup_commands != "Not specified" and typer.confirm("\nDo you want to execute the setup commands?", default=False):
+            console.print("\n[bold green]Executing setup commands...[/bold green]")
+            
+            # Split the setup commands into individual commands
+            commands = re.split(r"\n+", setup_commands.strip())
+            
+            for cmd in commands:
+                cmd = cmd.strip()
+                if not cmd or cmd.startswith("#"):
+                    continue
+                    
+                console.print(f"[bold]Executing:[/bold] {cmd}")
+                
+                try:
+                    shell = sys.platform == "win32"  # Use shell=True for Windows
+                    
+                    if shell:
+                        process = subprocess.run(
+                            cmd,
+                            cwd=project_dir,
+                            capture_output=True,
+                            text=True,
+                            shell=True
+                        )
+                    else:
+                        # Split the command properly using shlex for Unix-like systems
+                        command_args = shlex.split(cmd)
+                        process = subprocess.run(
+                            command_args,
+                            cwd=project_dir,
+                            capture_output=True,
+                            text=True
+                        )
+                    
+                    if process.returncode == 0:
+                        console.print(f"[green]Command completed successfully[/green]")
+                        if process.stdout:
+                            console.print(process.stdout)
+                    else:
+                        console.print(f"[bold red]Command failed with code {process.returncode}[/bold red]")
+                        console.print(f"Error: {process.stderr}")
+                        
+                        # Ask if user wants to continue with the next command
+                        if not typer.confirm("Continue with next command?", default=True):
+                            break
+                except Exception as e:
+                    console.print(f"[bold red]Error executing command: {str(e)}[/bold red]")
+                    
+                    # Ask if user wants to continue with the next command
+                    if not typer.confirm("Continue with next command?", default=True):
+                        break
+        
+        # Run post-setup detection to check if everything worked properly
+        try:
+            # Check for important files based on project type
+            missing_files = []
+            critical_file_patterns = {
+                "react": ["package.json", "src/App.*", "public/index.html"],
+                "vue": ["package.json", "src/App.vue", "src/main.js"],
+                "angular": ["package.json", "angular.json", "src/app"],
+                "next.js": ["package.json", "next.config.js"],
+                "express": ["package.json", "app.js"],
+                "django": ["manage.py", "*/settings.py"],
+                "flask": ["app.py", "requirements.txt"],
+                "spring": ["pom.xml", "src/main/java"],
+                "laravel": ["composer.json", "artisan"],
+                ".net": ["*.csproj", "Program.cs"],
+                "flutter": ["pubspec.yaml", "lib/main.dart"]
+            }
+            
+            # Determine which patterns to check based on project type
+            patterns_to_check = []
+            for framework, patterns in critical_file_patterns.items():
+                if framework.lower() in project_type.lower() or framework.lower() in project_info.get("main_technologies", "").lower():
+                    patterns_to_check.extend(patterns)
+            
+            # If we have patterns to check
+            if patterns_to_check:
+                console.print("\n[bold]Verifying project structure...[/bold]")
+                
+                for pattern in patterns_to_check:
+                    matching_files = list(project_dir.glob(pattern))
+                    if not matching_files:
+                        missing_files.append(pattern)
+                
+                if missing_files:
+                    console.print("[yellow]Warning: Some expected files were not found:[/yellow]")
+                    for pattern in missing_files:
+                        console.print(f"  - {pattern}")
+                    
+                    # If using scaffolding and still missing files, suggest solutions
+                    if scaffold_command and scaffold_command.lower() != "none":
+                        console.print("\n[yellow]The scaffolding may not have completed correctly.[/yellow]")
+                        console.print("You might want to manually run the appropriate scaffolding command:")
+                        console.print(f"[green]{scaffold_command}[/green]")
+                else:
+                    console.print("[green]Project structure verification passed.[/green]")
+        except Exception as e:
+            console.print(f"[yellow]Could not verify project structure: {str(e)}[/yellow]")
+        
         # Final success message with next steps
+        summary = []
+        
+        if len(skipped_files) > 0:
+            summary.append(f"Skipped {len(skipped_files)} existing files")
+            
+        if len(created_files) > 0:
+            summary.append(f"Created {len(created_files)} new files")
+            
+        if len(failed_files) > 0:
+            summary.append(f"Failed to create {len(failed_files)} files")
+            
         if failed_files:
             console.print("\n[bold red]Warning: Some files could not be created:[/bold red]")
             for file_path, error in failed_files:
                 console.print(f"  - {file_path}: {error}")
         
+        # Add framework-specific next steps
+        next_steps = [
+            f"1. cd {project_dir}",
+            f"2. Review the README.md for project details"
+        ]
+        
+        # Add framework-specific run commands
+        run_command = ""
+        if "react" in project_type.lower():
+            run_command = "npm start"
+        elif "vue" in project_type.lower():
+            run_command = "npm run serve"
+        elif "angular" in project_type.lower():
+            run_command = "ng serve"
+        elif "next.js" in project_type.lower():
+            run_command = "npm run dev"
+        elif "express" in project_type.lower() or "node" in project_type.lower():
+            run_command = "npm start"
+        elif "django" in project_type.lower():
+            run_command = "python manage.py runserver"
+        elif "flask" in project_type.lower():
+            run_command = "flask run"
+        elif "spring" in project_type.lower():
+            run_command = "./mvnw spring-boot:run"
+        elif "laravel" in project_type.lower():
+            run_command = "php artisan serve"
+        elif "flutter" in project_type.lower():
+            run_command = "flutter run"
+        
+        if run_command:
+            next_steps.append(f"3. Install any remaining dependencies")
+            next_steps.append(f"4. Start the application with: {run_command}")
+        else:
+            next_steps.append(f"3. Install any remaining dependencies")
+            next_steps.append(f"4. Start development based on the project structure")
+        
         console.print(Panel.fit(
             f"Project initialization complete!\n\n"
-            f"Created {len(created_files)} files in {project_dir}\n\n"
+            f"{', '.join(summary) if summary else 'Project created'} in {project_dir}\n\n"
             f"[bold]Next Steps:[/bold]\n"
-            f"  1. cd {project_dir}\n"
-            f"  2. Review the README.md for project details\n"
-            f"  3. Install dependencies as mentioned in the setup commands\n"
-            f"  4. Start development based on the project structure",
+            f"  {next_steps[0]}\n"
+            f"  {next_steps[1]}\n"
+            f"  {next_steps[2]}\n"
+            f"  {next_steps[3]}",
             title="Project Ready!",
             border_style="green"
         ))

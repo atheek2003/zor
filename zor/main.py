@@ -548,6 +548,9 @@ def init(prompt: str, directory: str = None):
             default=project_name
         ))
     
+    # Store the original user-specified directory
+    orig_project_dir = project_dir
+    
     # Check if directory exists
     if project_dir.exists() and any(project_dir.iterdir()):
         if not typer.confirm(f"Directory {project_dir} exists and is not empty. Continue anyway?", default=False):
@@ -638,6 +641,7 @@ def init(prompt: str, directory: str = None):
         import subprocess
         import sys
         import os
+        import shutil
         
         # Extract all sections with improved regex patterns
         sections = {
@@ -686,51 +690,55 @@ def init(prompt: str, directory: str = None):
         
         # Check if we need to run a scaffold command
         if scaffold_command and scaffold_command.lower() != "none":
-            # Framework-specific adjustments
-            # Extract the command base (e.g., "npx create-react-app" from "npx create-react-app my-app")
+            # Parse the original scaffold command
             command_parts = shlex.split(scaffold_command)
-            project_name_placeholder = "{project_name}"
-            project_path_placeholder = "{project_dir}"
+            project_name = project_dir.name
             
-            # Prepare the command with the actual project name/directory
-            if project_name_placeholder in scaffold_command:
-                scaffold_command = scaffold_command.replace(project_name_placeholder, project_dir.name)
-            elif project_path_placeholder in scaffold_command:
-                scaffold_command = scaffold_command.replace(project_path_placeholder, str(project_dir))
-            else:
-                # If no placeholder is used, we need to determine how to handle the project name/path
-                # based on the scaffold type and the specific framework
-                if scaffold_type == "CREATES_OWN_DIR":
-                    # Check if the command already has a project name/path at the end
+            # Handle different scaffold types properly
+            if scaffold_type == "CREATES_OWN_DIR":
+                # --------------------------------------
+                # KEY FIX: Handle directory creation for tools like create-react-app
+                # --------------------------------------
+                
+                if "create-react-app" in scaffold_command:
+                    # For create-react-app, the format is: npx create-react-app project-name
+                    scaffold_command = f"npx create-react-app {project_name}"
+                elif "vue@latest" in scaffold_command:
+                    # For Vue: npm init vue@latest project-name
+                    scaffold_command = f"npm init vue@latest {project_name}"
+                elif "ng new" in scaffold_command:
+                    # For Angular: ng new project-name
+                    scaffold_command = f"ng new {project_name}"
+                elif "create-next-app" in scaffold_command:
+                    # For Next.js: npx create-next-app project-name
+                    scaffold_command = f"npx create-next-app {project_name}"
+                else:
+                    # Default behavior for other commands
                     has_project_arg = False
-                    for part in command_parts[1:]:  # Skip the executable
+                    project_name_position = -1
+                    for i, part in enumerate(command_parts[1:], 1):  # Skip the executable
                         if not part.startswith("-") and "/" not in part and "=" not in part:
                             has_project_arg = True
+                            project_name_position = i
                             break
-                    
-                    if not has_project_arg:
-                        scaffold_command = f"{scaffold_command} {project_dir.name}"
-                elif scaffold_type == "NEEDS_EMPTY_DIR" or scaffold_type == "IN_PLACE":
-                    # No adjustment needed - will run in the project directory
-                    pass
-            
-            # Ask user permission to run the scaffold command
-            console.print(f"\n[bold]Official scaffolding command detected:[/bold]")
-            console.print(f"[green]{scaffold_command}[/green]")
-            console.print(f"Scaffold type: [cyan]{scaffold_type}[/cyan]")
-            
-            if typer.confirm("\nRun this scaffolding command?", default=True):
-                console.print("\n[bold green]Executing scaffolding command...[/bold green]")
+
+                    if has_project_arg:
+                        original_name = command_parts[project_name_position]
+                        command_parts[project_name_position] = project_name
+                        scaffold_command = " ".join(command_parts)
+                    else:
+                        scaffold_command = f"{scaffold_command} {project_name}"
                 
-                # Determine working directory and handle directory creation
-                if scaffold_type == "CREATES_OWN_DIR":
-                    # Execute in parent directory if command creates its own directory
-                    working_dir = project_dir.parent
-                    
-                    # Check if we need to remove existing directory for clean scaffold
-                    if project_dir.exists() and any(project_dir.iterdir()):
+                
+                # For CREATES_OWN_DIR, we'll now:
+                # 1. First remove the target directory if it exists
+                # 2. Then execute the scaffold command from the parent directory
+                # 3. Later verify the directory was created where we expected
+                
+                # Check if we need to remove the existing directory
+                if project_dir.exists():
+                    if any(project_dir.iterdir()):
                         if typer.confirm(f"Directory {project_dir} exists. Remove it for clean scaffolding?", default=False):
-                            import shutil
                             try:
                                 shutil.rmtree(project_dir)
                                 console.print(f"[bold]Removed existing directory: {project_dir}[/bold]")
@@ -739,30 +747,63 @@ def init(prompt: str, directory: str = None):
                                 if not typer.confirm("Continue anyway?", default=False):
                                     typer.echo("Project initialization cancelled.")
                                     raise typer.Exit()
-                elif scaffold_type == "NEEDS_EMPTY_DIR":
-                    # Execute in the project directory, but ensure it's empty
-                    working_dir = project_dir
-                    
-                    # Check if directory is empty
-                    if any(project_dir.iterdir()):
-                        if typer.confirm(f"Directory {project_dir} is not empty. Clear it for scaffolding?", default=False):
-                            import shutil
-                            try:
-                                # Remove all contents but keep the directory
-                                for item in project_dir.iterdir():
-                                    if item.is_dir():
-                                        shutil.rmtree(item)
-                                    else:
-                                        item.unlink()
-                                console.print(f"[bold]Cleared directory contents: {project_dir}[/bold]")
-                            except Exception as e:
-                                console.print(f"[bold red]Error clearing directory: {str(e)}[/bold red]")
-                                if not typer.confirm("Continue anyway?", default=False):
-                                    typer.echo("Project initialization cancelled.")
-                                    raise typer.Exit()
-                else:  # IN_PLACE or default
-                    # Execute in the project directory
-                    working_dir = project_dir
+                    else:
+                        # If directory exists but is empty, remove it anyway for clean scaffolding
+                        try:
+                            project_dir.rmdir()
+                            console.print(f"[bold]Removed empty directory: {project_dir}[/bold]")
+                        except Exception as e:
+                            console.print(f"[bold yellow]Could not remove empty directory: {str(e)}[/bold yellow]")
+                
+                # The working directory will be the parent directory
+                working_dir = project_dir.parent
+                
+            elif scaffold_type == "NEEDS_EMPTY_DIR":
+                # For NEEDS_EMPTY_DIR, we'll run inside the project directory but ensure it's empty
+                if any(project_dir.iterdir()):
+                    if typer.confirm(f"Directory {project_dir} is not empty. Clear it for scaffolding?", default=False):
+                        try:
+                            # Remove all contents but keep the directory
+                            for item in project_dir.iterdir():
+                                if item.is_dir():
+                                    shutil.rmtree(item)
+                                else:
+                                    item.unlink()
+                            console.print(f"[bold]Cleared directory contents: {project_dir}[/bold]")
+                        except Exception as e:
+                            console.print(f"[bold red]Error clearing directory: {str(e)}[/bold red]")
+                            if not typer.confirm("Continue anyway?", default=False):
+                                typer.echo("Project initialization cancelled.")
+                                raise typer.Exit()
+                
+                # Check if the command has a project name and remove it if needed
+                for i, part in enumerate(command_parts[1:], 1):
+                    if not part.startswith("-") and "/" not in part and "=" not in part:
+                        # Remove the project name since we're running in the directory already
+                        command_parts.pop(i)
+                        scaffold_command = " ".join(command_parts)
+                        break
+                
+                working_dir = project_dir
+                
+            else:  # IN_PLACE or default
+                # For IN_PLACE, we'll just run in the directory
+                working_dir = project_dir
+            
+            # If command has placeholders, replace them
+            if "{project_name}" in scaffold_command:
+                scaffold_command = scaffold_command.replace("{project_name}", project_name)
+            if "{project_dir}" in scaffold_command:
+                scaffold_command = scaffold_command.replace("{project_dir}", str(project_dir))
+            
+            # Ask user permission to run the scaffold command
+            console.print(f"\n[bold]Official scaffolding command detected:[/bold]")
+            console.print(f"[green]{scaffold_command}[/green]")
+            console.print(f"Scaffold type: [cyan]{scaffold_type}[/cyan]")
+            console.print(f"Will execute in: [cyan]{working_dir}[/cyan]")
+            
+            if typer.confirm("\nRun this scaffolding command?", default=True):
+                console.print("\n[bold green]Executing scaffolding command...[/bold green]")
                 
                 try:
                     # Handle platform-specific command execution
@@ -807,35 +848,80 @@ def init(prompt: str, directory: str = None):
                         typer.echo("Project initialization cancelled.")
                         raise typer.Exit()
                 
-                # Update project directory if necessary - handle various scaffolding behaviors
+                # Handle directory verification and cleanup after scaffolding
                 if scaffold_type == "CREATES_OWN_DIR":
-                    # Check various common patterns for project directory creation
-                    potential_dirs = [
-                        project_dir,  # Original expected location
-                        project_dir.parent / project_dir.name.lower(),  # Lowercase version
-                        project_dir.parent / project_dir.name.replace("-", "_"),  # Python style
-                        project_dir.parent / project_dir.name.replace("_", "-")   # JS style
-                    ]
-                    
-                    # Look for standard variations of the project name that might have been created
-                    for potential_dir in potential_dirs:
-                        if potential_dir.exists() and potential_dir != project_dir:
-                            console.print(f"[bold yellow]Project was created at: {potential_dir}[/bold yellow]")
-                            if typer.confirm(f"Use this directory instead of {project_dir}?", default=True):
-                                project_dir = potential_dir
+                    # Check if the expected directory was created
+                    if project_dir.exists():
+                        console.print(f"[bold green]Project directory created successfully at: {project_dir}[/bold green]")
+                    else:
+                        # Check common variations of the project directory name
+                        potential_dirs = [
+                            working_dir / project_name.lower(),
+                            working_dir / project_name.replace("-", "_"),
+                            working_dir / project_name.replace("_", "-")
+                        ]
+                        
+                        found_dir = None
+                        for potential_dir in potential_dirs:
+                            if potential_dir.exists() and potential_dir != project_dir:
+                                found_dir = potential_dir
                                 break
-                    
-                    # If we still don't have a valid directory, ask the user
-                    if not project_dir.exists():
-                        console.print(f"[bold red]Expected project directory {project_dir} was not created.[/bold red]")
-                        # Allow user to specify where the project was created
-                        new_dir = typer.prompt("Please enter the path where the project was created:")
-                        potential_dir = Path(new_dir)
-                        if potential_dir.exists():
-                            project_dir = potential_dir
+                        
+                        if found_dir:
+                            console.print(f"[bold yellow]Project was created at: {found_dir}[/bold yellow]")
+                            
+                            # Three options: move files, rename directory, or use the new dir
+                            console.print("\nOptions:")
+                            console.print(f"1. Move files from {found_dir} to {project_dir}")
+                            console.print(f"2. Use {found_dir} as the project directory")
+                            console.print(f"3. Cancel project creation")
+                            
+                            choice = typer.prompt("Choose option", type=int, default=1)
+                            
+                            if choice == 1:
+                                # Create the target directory if it doesn't exist
+                                project_dir.mkdir(exist_ok=True, parents=True)
+                                
+                                # Move all contents from found_dir to project_dir
+                                try:
+                                    # Copy all files and subdirectories
+                                    for item in found_dir.iterdir():
+                                        if item.is_dir():
+                                            shutil.copytree(item, project_dir / item.name)
+                                        else:
+                                            shutil.copy2(item, project_dir / item.name)
+                                    
+                                    # Remove the source directory
+                                    shutil.rmtree(found_dir)
+                                    console.print(f"[green]Successfully moved files to {project_dir}[/green]")
+                                except Exception as e:
+                                    console.print(f"[bold red]Error moving files: {str(e)}[/bold red]")
+                                    console.print(f"[yellow]Will continue using {found_dir} as project directory[/yellow]")
+                                    project_dir = found_dir
+                            elif choice == 2:
+                                # Use the found directory
+                                project_dir = found_dir
+                                console.print(f"[green]Using {project_dir} as project directory[/green]")
+                            else:
+                                typer.echo("Project initialization cancelled.")
+                                raise typer.Exit()
                         else:
-                            console.print(f"[bold red]Directory {potential_dir} does not exist.[/bold red]")
-                            if not typer.confirm("Continue with file generation anyway?", default=False):
+                            console.print(f"[bold red]Expected project directory was not created at {project_dir}[/bold red]")
+                            
+                            # Let user specify where the project was created
+                            new_dir = typer.prompt("Please enter the path where the project was created (or leave empty to cancel)")
+                            
+                            if new_dir:
+                                potential_dir = Path(new_dir)
+                                if potential_dir.exists():
+                                    project_dir = potential_dir
+                                    console.print(f"[green]Using {project_dir} as project directory[/green]")
+                                else:
+                                    console.print(f"[bold red]Directory {potential_dir} does not exist.[/bold red]")
+                                    if not typer.confirm("Continue with file generation anyway?", default=False):
+                                        typer.echo("Project initialization cancelled.")
+                                        raise typer.Exit()
+                            else:
                                 typer.echo("Project initialization cancelled.")
                                 raise typer.Exit()
         

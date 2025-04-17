@@ -107,7 +107,8 @@ zor interactive
 ### Create or Initialize new project
 
 ```bash
-zor init "create a modern React portfolio app for a software engineer with dark theme"```
+zor init "create a modern React portfolio app for a software engineer with dark theme"
+```
 
 ### To know more about a command
 

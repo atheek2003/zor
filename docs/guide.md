@@ -100,7 +100,8 @@ Zor will:
 ### Creating New Project with Zor
 
 ```bash
-zor init "create a modern React portfolio app for a software engineer with dark theme"```
+zor init "create a modern React portfolio app for a software engineer with dark theme"
+```
 Zor will:
 1. Create entire project structures with just a description
 2. Analyzes your requirements and determines the appropriate project type, technologies, and architecture

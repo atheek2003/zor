@@ -1034,11 +1034,12 @@ def init(prompt: str, directory: str = None):
                 console.print(f"Error creating {file_path}: {str(e)}", style="bold red")
         
         # Always display setup commands (but don't execute them yet)
-        console.print("\n[bold]Setup Commands (for reference):[/bold]")
-        if setup_commands and setup_commands != "Not specified":
-            console.print(setup_commands)
-        else:
-            console.print("[italic]No setup commands specified[/italic]")
+        # console.print("\n[bold]Setup Commands (for reference):[/bold]")
+        # if setup_commands and setup_commands != "Not specified":
+            # console.print(setup_commands)
+        # else:
+            # console.print("[italic]No setup commands specified[/italic]")
+        console.print("Skipping setup commands display for now")
         
         # Show development recommendations
         if project_info.get("development_recommendations") != "Not specified":
@@ -1046,57 +1047,57 @@ def init(prompt: str, directory: str = None):
             console.print(project_info.get("development_recommendations"))
         
         # Ask if user wants to execute setup commands
-        if setup_commands and setup_commands != "Not specified" and typer.confirm("\nDo you want to execute the setup commands?", default=False):
-            console.print("\n[bold green]Executing setup commands...[/bold green]")
+        # if setup_commands and setup_commands != "Not specified" and typer.confirm("\nDo you want to execute the setup commands?", default=False):
+            # console.print("\n[bold green]Executing setup commands...[/bold green]")
             
             # Split the setup commands into individual commands
-            commands = re.split(r"\n+", setup_commands.strip())
+            # commands = re.split(r"\n+", setup_commands.strip())
             
-            for cmd in commands:
-                cmd = cmd.strip()
-                if not cmd or cmd.startswith("#"):
-                    continue
+            # for cmd in commands:
+                # cmd = cmd.strip()
+                # if not cmd or cmd.startswith("#"):
+                    # continue
                     
-                console.print(f"[bold]Executing:[/bold] {cmd}")
+                # console.print(f"[bold]Executing:[/bold] {cmd}")
                 
-                try:
-                    shell = sys.platform == "win32"  # Use shell=True for Windows
+                # try:
+                    # shell = sys.platform == "win32"  # Use shell=True for Windows
                     
-                    if shell:
-                        process = subprocess.run(
-                            cmd,
-                            cwd=project_dir,
-                            capture_output=True,
-                            text=True,
-                            shell=True
-                        )
-                    else:
+                    # if shell:
+                        # process = subprocess.run(
+                            # cmd,
+                            # cwd=project_dir,
+                            # capture_output=True,
+                            # text=True,
+                            # shell=True
+                        # )
+                    # else:
                         # Split the command properly using shlex for Unix-like systems
-                        command_args = shlex.split(cmd)
-                        process = subprocess.run(
-                            command_args,
-                            cwd=project_dir,
-                            capture_output=True,
-                            text=True
-                        )
+                        # command_args = shlex.split(cmd)
+                        # process = subprocess.run(
+                            # command_args,
+                            # cwd=project_dir,
+                            # capture_output=True,
+                            # text=True
+                        # )
                     
-                    if process.returncode == 0:
-                        console.print(f"[green]Command completed successfully[/green]")
-                        if process.stdout:
-                            console.print(process.stdout)
-                    else:
-                        console.print(f"[bold red]Command failed with code {process.returncode}[/bold red]")
-                        console.print(f"Error: {process.stderr}")
+                    # if process.returncode == 0:
+                        # console.print(f"[green]Command completed successfully[/green]")
+                        # if process.stdout:
+                            # console.print(process.stdout)
+                    # else:
+                        # console.print(f"[bold red]Command failed with code {process.returncode}[/bold red]")
+                        # console.print(f"Error: {process.stderr}")
                         
                         # Ask if user wants to continue with the next command
-                        if not typer.confirm("Continue with next command?", default=True):
-                            break
-                except Exception as e:
-                    console.print(f"[bold red]Error executing command: {str(e)}[/bold red]")
+                        # if not typer.confirm("Continue with next command?", default=True):
+                            # break
+                # except Exception as e:
+                    # console.print(f"[bold red]Error executing command: {str(e)}[/bold red]")
                     
                     # Ask if user wants to continue with the next command
-                    if not typer.confirm("Continue with next command?", default=True):
-                        break
+                    # if not typer.confirm("Continue with next command?", default=True):
+                        # break
         
         # Run post-setup detection to check if everything worked properly
         try:

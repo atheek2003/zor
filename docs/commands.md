@@ -14,6 +14,16 @@ zor ask "How does rate limiting work in this project?"
 
 **Options**: None
 
+
+### `zor init`
+
+Create a new project based on natural language instructions.
+
+```bash
+zor init "create a modern React portfolio app for a software engineer with dark theme"```
+**Arguments**: 
+- `--directory` : Specify the directory name for the new project
+
 ### `zor edit`
 
 Edit a file based on natural language instructions.

@@ -5,3 +5,5 @@ zor/__pycache__/
 dist/
 tests/__pycache__/
 run_tests.sh
+zor/test.py
+.pytest_cache/

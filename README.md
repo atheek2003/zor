@@ -7,6 +7,7 @@
   [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
   [![Python Version](https://img.shields.io/badge/python-3.9%2B-blue)](https://www.python.org/downloads/)
   [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
+  ![Builds](https://github.com/arjuuuuunnnnn/zor/actions/workflows/python-package.yml/badge.svg)
 </div>
 
 ## Overview
@@ -23,6 +24,7 @@ Think of it as an open-source alternative to tools like Claude Code - your AI pa
 - 🧪 **Generate Tests**: Automatically create tests for your code
 - 🔄 **Refactor Code**: Implement complex changes across multiple files
 - 🔧 **Git Integration**: Commit changes directly from Zor
+- 🧠 **Project Creation**: Create new projects with description provided
 
 ## Installation
 
@@ -45,6 +47,10 @@ pip install zor
 3. **Start an interactive session**:
    ```bash
    zor interactive
+   ```
+4. **Create new Project with Zor**:
+   ```bash
+   zor init "create a modern React portfolio app for a software engineer with dark theme"
    ```
 
 ## Documentation

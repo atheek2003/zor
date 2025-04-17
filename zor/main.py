@@ -8,9 +8,13 @@ from .file_ops import edit_file, show_diff
 from .git_utils import git_commit
 from .api import generate_with_context
 from .config import load_config, save_config
-from typing import Optional, Annotated, Callable
+from typing import Optional, Annotated, Callable, List
 from functools import wraps
 from typer.core import TyperGroup
+from rich.console import Console
+from rich.panel import Panel
+import subprocess
+import shutil
 
 app = typer.Typer()
 
@@ -78,6 +82,7 @@ def help():
     
     commands = [
         ("ask", "Ask Zor about your codebase"),
+        ("init", "Create a new project based on natural language instructions"),
         ("edit", "Edit a file based on natural language instructions"),
         ("commit", "Create a git commit with the given message"),
         ("config", "View configuration"),
@@ -102,7 +107,7 @@ def help():
 @app.command()
 @require_api_key
 def ask(prompt: str):
-    """Ask Gemini about your codebase"""
+    """Ask Zor about your codebase"""
     context = get_codebase_context()
     response = generate_with_context(prompt, context)
     print(response)
@@ -147,7 +152,6 @@ def edit(file_path: str, prompt: str):
             typer.echo("File update failed", err=True)
 
 @app.command()
-@require_api_key
 def commit(message: str):
     """Create a git commit with the given message"""
     if git_commit(message):
@@ -157,7 +161,7 @@ def commit(message: str):
 
 @app.command()
 def config(key: str = None, value: str = None):
-    """View or update configuration"""
+    """View configuration"""
     current_config = load_config()
     
     if key is None and value is None:
@@ -211,7 +215,7 @@ def extract_code_blocks(text):
 @app.command()
 @require_api_key
 def interactive():
-    """Start an interactive session with the AI assistant"""
+    """Start an interactive session with the Zor AI assistant"""
     typer.echo("Starting interactive session. Type 'exit' to quit.")
     typer.echo("Loading codebase context...")
     
@@ -516,6 +520,238 @@ def setup():
     except Exception as e:
         typer.echo(f"Error saving API key: {str(e)}", err=True)
 
+# NEW FEAT: INIT
+@app.command()
+@require_api_key
+def init(prompt: str, directory: str = None):
+    """Create a new project based on natural language instructions"""
+    console = Console()
+    
+    # Handle project directory
+    if directory:
+        project_dir = Path(directory)
+    else:
+        # Extract project name from prompt using more intelligent parsing
+        words = prompt.lower().split()
+        project_name = words[0].replace(" ", "_")
+        
+        # Check for actual project name in the first few words
+        name_indicators = ["called", "named", "name", "project"]
+        for i, word in enumerate(words):
+            if word in name_indicators and i+1 < len(words):
+                project_name = words[i+1].replace(" ", "_")
+                break
+        
+        # Confirm with user
+        project_dir = Path(typer.prompt(
+            "Project directory name", 
+            default=project_name
+        ))
+    
+    # Check if directory exists
+    if project_dir.exists() and any(project_dir.iterdir()):
+        if not typer.confirm(f"Directory {project_dir} exists and is not empty. Continue anyway?", default=False):
+            typer.echo("Project initialization cancelled.")
+            raise typer.Exit()
+    
+    # Create directory if it doesn't exist
+    project_dir.mkdir(exist_ok=True, parents=True)
+    
+    # Generate project structure based on prompt
+    with console.status("[bold green]Analyzing project requirements...", spinner="dots") as status:
+        # Create context for API call
+        context = {"project_prompt": prompt}
+        
+        # First, get the project plan and type with a more comprehensive prompt
+        planning_prompt = f"""
+        I need to create a new project with this description: "{prompt}"
+        
+        Please provide a comprehensive analysis and detailed project plan. Include:
+        
+        1. Project type and main technologies (language, framework, libraries)
+        2. Project architecture and design patterns to use
+        3. Required file structure with explanation of each component
+        4. Key files that need to be created with their purpose
+        5. Dependencies that would need to be installed
+        6. Development environment recommendations
+        7. Any best practices specific to this type of project
+        
+        Format the response as:
+        
+        PROJECT_TYPE: [project type]
+        
+        MAIN_TECHNOLOGIES: [comma-separated list of main technologies]
+        
+        ARCHITECTURE: [Brief description of recommended architecture]
+        
+        PROJECT_PLAN:
+        [Detailed explanation of the project structure and components]
+        
+        DEPENDENCIES:
+        [List of key dependencies with versions if applicable]
+        
+        SETUP_COMMANDS:
+        [List of commands that would be used to initialize and setup the project]
+        
+        FILE_STRUCTURE:
+        [Tree structure of directories and files to be created]
+        
+        DEVELOPMENT_RECOMMENDATIONS:
+        [Recommendations for development environment and workflows]
+        """
+        
+        status.update("[bold green]Generating project blueprint...")
+        plan_response = generate_with_context(planning_prompt, context)
+        
+        # Parse the response to extract project information
+        import re
+        
+        # Extract all sections with improved regex patterns
+        sections = {
+            "project_type": re.search(r"PROJECT_TYPE:\s*(.*?)(?:\n\s*\n|\n\s*[A-Z_]+:)", plan_response + "\n\n", re.DOTALL),
+            "main_technologies": re.search(r"MAIN_TECHNOLOGIES:\s*(.*?)(?:\n\s*\n|\n\s*[A-Z_]+:)", plan_response + "\n\n", re.DOTALL),
+            "architecture": re.search(r"ARCHITECTURE:\s*(.*?)(?:\n\s*\n|\n\s*[A-Z_]+:)", plan_response + "\n\n", re.DOTALL),
+            "dependencies": re.search(r"DEPENDENCIES:(.*?)(?:\n\s*\n|\n\s*[A-Z_]+:)", plan_response + "\n\n", re.DOTALL),
+            "setup_commands": re.search(r"SETUP_COMMANDS:(.*?)(?:\n\s*\n|\n\s*[A-Z_]+:)", plan_response + "\n\n", re.DOTALL),
+            "development_recommendations": re.search(r"DEVELOPMENT_RECOMMENDATIONS:(.*?)(?:\n\s*\n|\n\s*[A-Z_]+:|$)", plan_response + "\n\n", re.DOTALL)
+        }
+        
+        # Process extracted sections
+        project_info = {}
+        for key, match in sections.items():
+            project_info[key] = match.group(1).strip() if match else "Not specified"
+        
+        # Get project type with fallback
+        project_type = project_info.get("project_type", "Unknown")
+        setup_commands = project_info.get("setup_commands", "")
+        
+        # Show the project plan to the user with improved formatting
+        status.stop()
+        
+        console.print("\n[bold cyan]📋 Project Blueprint[/bold cyan]")
+        console.print(f"\n[bold]Project Type:[/bold] {project_type}")
+        
+        if project_info.get("main_technologies") != "Not specified":
+            console.print(f"\n[bold]Main Technologies:[/bold]")
+            console.print(project_info.get("main_technologies"))
+            
+        if project_info.get("architecture") != "Not specified":
+            console.print(f"\n[bold]Architecture:[/bold]")
+            console.print(project_info.get("architecture"))
+        
+        console.print("\n[bold]Project Plan:[/bold]")
+        console.print(plan_response)
+        
+        # Confirm with user before proceeding
+        if not typer.confirm("\nProceed with project creation?", default=True):
+            typer.echo("Project initialization cancelled.")
+            raise typer.Exit()
+        
+        # Improved file generation prompt with more context
+        file_generation_prompt = f"""
+        Based on the project description: "{prompt}"
+        
+        And identified project type: {project_type}
+        
+        Generate the content for each key file in the project. For each file, provide:
+        1. The file path relative to the project root
+        2. The complete content of the file
+        3. A brief comment at the top of each file explaining its purpose
+        
+        Format your response like this:
+        
+        FILE: path/to/file1
+        ```
+        // Purpose: Brief explanation of this file's role in the project
+        // content of file1
+        ```
+        
+        FILE: path/to/file2
+        ```
+        // Purpose: Brief explanation of this file's role in the project
+        // content of file2
+        ```
+        
+        IMPORTANT GUIDELINES:
+        - Always include a comprehensive README.md with:
+          * Project description and features
+          * Setup instructions (installation, configuration)
+          * Usage examples with code snippets
+          * API documentation if applicable
+          * Contribution guidelines
+        - Include appropriate configuration files (.gitignore, package.json, requirements.txt, etc.)
+        - Provide complete, functional code for each file (no placeholders or TODOs)
+        - For React or web projects, include necessary HTML, CSS, and JS files
+        - For Python projects, include appropriate requirements.txt and setup files
+        - Ensure code follows best practices and style conventions for the language
+        - Add appropriate comments and documentation in the code
+        - Include unit tests where appropriate
+        """
+        
+        # Generate file contents
+        with console.status("[bold green]Generating project files...", spinner="dots") as status:
+            files_response = generate_with_context(file_generation_prompt, context)
+            status.stop()
+            
+        # Parse the response to extract file paths and contents
+        file_matches = re.findall(r"FILE: (.+?)\n```(?:\w+)?\n(.+?)```", files_response, re.DOTALL)
+        
+        if not file_matches:
+            typer.echo("Error: Could not parse file generation response", err=True)
+            console.print(files_response)
+            raise typer.Exit(1)
+        
+        # Create the files with improved error handling and reporting
+        console.print(Panel.fit(f"Creating {len(file_matches)} files...", title="File Creation"))
+        
+        created_files = []
+        failed_files = []
+        
+        for file_path, content in file_matches:
+            full_path = project_dir / file_path.strip()
+            
+            # Create directories if they don't exist
+            try:
+                full_path.parent.mkdir(parents=True, exist_ok=True)
+                
+                # Write the file
+                with open(full_path, "w") as f:
+                    f.write(content)
+                created_files.append(str(full_path))
+                console.print(f"Created: [green]{file_path}[/green]")
+            except Exception as e:
+                failed_files.append((file_path, str(e)))
+                console.print(f"Error creating {file_path}: {str(e)}", style="bold red")
+        
+        # Always display setup commands (but don't execute them)
+        console.print("\n[bold]Setup Commands (for reference):[/bold]")
+        if setup_commands and setup_commands != "Not specified":
+            console.print(setup_commands)
+        else:
+            console.print("[italic]No setup commands specified[/italic]")
+        
+        # Show development recommendations
+        if project_info.get("development_recommendations") != "Not specified":
+            console.print("\n[bold]Development Recommendations:[/bold]")
+            console.print(project_info.get("development_recommendations"))
+        
+        # Final success message with next steps
+        if failed_files:
+            console.print("\n[bold red]Warning: Some files could not be created:[/bold red]")
+            for file_path, error in failed_files:
+                console.print(f"  - {file_path}: {error}")
+        
+        console.print(Panel.fit(
+            f"Project initialization complete!\n\n"
+            f"Created {len(created_files)} files in {project_dir}\n\n"
+            f"[bold]Next Steps:[/bold]\n"
+            f"  1. cd {project_dir}\n"
+            f"  2. Review the README.md for project details\n"
+            f"  3. Install dependencies as mentioned in the setup commands\n"
+            f"  4. Start development based on the project structure",
+            title="Project Ready!",
+            border_style="green"
+        ))
 
 if __name__ == "__main__":
     app()

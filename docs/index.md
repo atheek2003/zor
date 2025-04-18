@@ -3,8 +3,9 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python Version](https://img.shields.io/badge/python-3.9%2B-blue)](https://www.python.org/downloads/)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
-![Builds](https://github.com/arjuuuuunnnnn/zor/actions/workflows/python-package.yml/badge.svg)
+![Build Status](https://github.com/arjuuuuunnnnn/zor/actions/workflows/python-package.yml/badge.svg)
 [![PyPI Downloads](https://static.pepy.tech/badge/zor)](https://pepy.tech/projects/zor)
+[![Stable Version](https://img.shields.io/pypi/v/zor?color=blue)](https://pypi.org/project/zor/)
 
 
 <div align="center">

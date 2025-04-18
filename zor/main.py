@@ -88,11 +88,10 @@ def help():
         ("config", "View configuration"),
         ("interactive", "Start an interactive session with the Zor AI assistant"),
         ("history", "Show conversation history"),
-        ("generate_test", "Generate tests for a specific file"),
+        ("generate-test", "Generate tests for a specific file"),
         ("refactor", "Refactor code across multiple files based on instructions"),
         ("setup", "Configure your Gemini API key"),
-        ("help", "Display all available commands and their descriptions"),
-        ("review", "Analyze the codebase and provides insights")
+        ("help", "Display all available commands and their descriptions")
     ]
     
     for cmd, desc in commands:
@@ -455,6 +454,19 @@ Only include files that need to be changed. Do not include any explanations outs
 def setup():
     """Configure your Gemini API key"""
     global api_key_valid
+
+    zor_ascii = r"""
+███████╗ ██████╗ ██████╗
+╚══███╔╝██╔═══██╗██╔══██╗
+  ███╔╝ ██║   ██║██████╔╝
+ ███╔╝  ██║   ██║██╔══██╗
+███████╗╚██████╔╝██║  ██║
+╚══════╝ ╚═════╝ ╚═╝  ╚═╝
+"""
+    console = Console()
+    console.print(zor_ascii, style="bold green")
+    # typer.echo(zor_ascii)
+    typer.echo("\n")
     
     config = load_config()
     current_api_key = config.get("api_key")
@@ -465,7 +477,7 @@ def setup():
             typer.echo("Setup cancelled. Keeping existing API key.")
             return
 
-    api_key = typer.prompt("Enter your Gemini API key", hide_input=True)
+    api_key = typer.prompt("Enter your Gemini API key", hide_input=False, confirmation_prompt=True)
     
     # Validate API key
     typer.echo("Validating API key...")
@@ -522,10 +534,6 @@ def setup():
         typer.echo(f"Error saving API key: {str(e)}", err=True)
 
 # NEW FEAT: INIT
-
-
-
-
 @app.command()
 @require_api_key
 def init(prompt: str, directory: str = None, install: bool = typer.Option(True, "--install", "-i", help="Install dependencies after project creation"), run: bool = typer.Option(True, "--run", "-r", help="Run the application after setup")):
@@ -1484,6 +1492,5 @@ def init(prompt: str, directory: str = None, install: bool = typer.Option(True, 
             border_style="green"
         ))
 
-                
 if __name__ == "__main__":
     app()

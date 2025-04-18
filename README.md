@@ -8,6 +8,7 @@
   [![Python Version](https://img.shields.io/badge/python-3.9%2B-blue)](https://www.python.org/downloads/)
   [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
   ![Builds](https://github.com/arjuuuuunnnnn/zor/actions/workflows/python-package.yml/badge.svg)
+  [![PyPI Downloads](https://static.pepy.tech/badge/zor)](https://pepy.tech/projects/zor)
 </div>
 
 ## Overview

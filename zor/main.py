@@ -88,7 +88,7 @@ def help():
         ("config", "View configuration"),
         ("interactive", "Start an interactive session with the Zor AI assistant"),
         ("history", "Show conversation history"),
-        ("generate-test", "Generate tests for a specific file"),
+        ("generate_test", "Generate tests for a specific file"),
         ("refactor", "Refactor code across multiple files based on instructions"),
         ("setup", "Configure your Gemini API key"),
         ("help", "Display all available commands and their descriptions"),
@@ -455,19 +455,6 @@ Only include files that need to be changed. Do not include any explanations outs
 def setup():
     """Configure your Gemini API key"""
     global api_key_valid
-
-    zor_ascii = r"""
-███████╗ ██████╗ ██████╗
-╚══███╔╝██╔═══██╗██╔══██╗
-  ███╔╝ ██║   ██║██████╔╝
- ███╔╝  ██║   ██║██╔══██╗
-███████╗╚██████╔╝██║  ██║
-╚══════╝ ╚═════╝ ╚═╝  ╚═╝
-"""
-    console = Console()
-    console.print(zor_ascii, style="bold green")
-    # typer.echo(zor_ascii)
-    typer.echo("\n")
     
     config = load_config()
     current_api_key = config.get("api_key")
@@ -478,7 +465,7 @@ def setup():
             typer.echo("Setup cancelled. Keeping existing API key.")
             return
 
-    api_key = typer.prompt("Enter your Gemini API key", hide_input=False, confirmation_prompt=True)
+    api_key = typer.prompt("Enter your Gemini API key", hide_input=True)
     
     # Validate API key
     typer.echo("Validating API key...")
@@ -535,6 +522,10 @@ def setup():
         typer.echo(f"Error saving API key: {str(e)}", err=True)
 
 # NEW FEAT: INIT
+
+
+
+
 @app.command()
 @require_api_key
 def init(prompt: str, directory: str = None, install: bool = typer.Option(True, "--install", "-i", help="Install dependencies after project creation"), run: bool = typer.Option(True, "--run", "-r", help="Run the application after setup")):
@@ -656,6 +647,7 @@ def init(prompt: str, directory: str = None, install: bool = typer.Option(True, 
         import sys
         import os
         import shutil
+        import json
         
         # Extract all sections with improved regex patterns
         sections = {
@@ -679,6 +671,29 @@ def init(prompt: str, directory: str = None, install: bool = typer.Option(True, 
         setup_commands = project_info.get("setup_commands", "")
         scaffold_command = project_info.get("scaffold_command", "NONE")
         scaffold_type = project_info.get("scaffold_type", "NONE").upper()
+        dependencies = project_info.get("dependencies", "")
+        
+        # Extract specific dependencies for later installation
+        extracted_dependencies = []
+        if dependencies != "Not specified":
+            # Parse dependencies from the formatted list
+            dep_lines = dependencies.strip().split('\n')
+            for line in dep_lines:
+                line = line.strip()
+                if line and not line.startswith('#'):
+                    # Try to extract package name from formats like:
+                    # - react-router-dom: ^6.0.0
+                    # - react-router-dom ^6.0.0
+                    # - react-router-dom
+                    parts = re.split(r'[:,\s]\s*', line.lstrip('- ').strip())
+                    if parts:
+                        package_name = parts[0].strip()
+                        version = parts[1].strip() if len(parts) > 1 else ""
+                        if package_name and not package_name.startswith('#'):
+                            if version and version.startswith('^') or version.startswith('~'):
+                                extracted_dependencies.append(f"{package_name}@{version}")
+                            else:
+                                extracted_dependencies.append(package_name)
         
         # Show the project plan to the user with improved formatting
         status.stop()
@@ -702,7 +717,8 @@ def init(prompt: str, directory: str = None, install: bool = typer.Option(True, 
             typer.echo("Project initialization cancelled.")
             raise typer.Exit()
         
-        # Check if we need to run a scaffold command
+
+        # Replace the existing scaffold command execution section with this improved version
         if scaffold_command and scaffold_command.lower() != "none":
             # Parse the original scaffold command
             command_parts = shlex.split(scaffold_command)
@@ -725,7 +741,112 @@ def init(prompt: str, directory: str = None, install: bool = typer.Option(True, 
                     scaffold_command = f"ng new {project_name}"
                 elif "create-next-app" in scaffold_command:
                     # For Next.js: npx create-next-app project-name
-                    scaffold_command = f"npx create-next-app {project_name}"
+                    # Determine flags for Next.js interactive prompts
+                    next_flags = ""
+                    
+                    # Only add flags if the user wants to bypass interactive mode
+                    if not typer.confirm("Do you want to use Next.js interactive setup? (No will use default settings)", default=True):
+                        # Get user preferences for Next.js setup
+                        use_typescript = typer.confirm("Use TypeScript?", default=True)
+                        use_eslint = typer.confirm("Use ESLint?", default=True)
+                        use_tailwind = typer.confirm("Use Tailwind CSS?", default=True)
+                        use_src_dir = typer.confirm("Use src/ directory?", default=True)
+                        use_app_router = typer.confirm("Use App Router? (recommended)", default=True)
+                        customize_import_alias = typer.confirm("Customize import alias?", default=False)
+                        
+                        # Build flags based on preferences
+                        if use_typescript:
+                            next_flags += " --typescript"
+                        else:
+                            next_flags += " --no-typescript"
+                            
+                        if use_eslint:
+                            next_flags += " --eslint"
+                        else:
+                            next_flags += " --no-eslint"
+                            
+                        if use_tailwind:
+                            next_flags += " --tailwind"
+                        else:
+                            next_flags += " --no-tailwind"
+                            
+                        if use_src_dir:
+                            next_flags += " --src-dir"
+                        else:
+                            next_flags += " --no-src-dir"
+                            
+                        if use_app_router:
+                            next_flags += " --app"
+                        else:
+                            next_flags += " --no-app"
+                            
+                        if customize_import_alias:
+                            import_alias = typer.prompt("Import alias (default is @)", default="@")
+                            next_flags += f" --import-alias=\"{import_alias}\""
+                        
+                        # Add all flags to the command
+                        scaffold_command = f"npx create-next-app {project_name}{next_flags}"
+                    else:
+                        scaffold_command = f"npx create-next-app {project_name}"
+                    # For Vue.js interactive setup
+                elif "vue@latest" in scaffold_command:
+                    # For Vue: npm init vue@latest project-name
+                    if typer.confirm("Do you want to use Vue.js interactive setup? (No will use default settings)", default=True):
+                        scaffold_command = f"npm init vue@latest {project_name}"
+                    else:
+                        # Get user preferences for Vue.js setup
+                        use_typescript = typer.confirm("Add TypeScript?", default=False)
+                        use_jsx = typer.confirm("Add JSX Support?", default=False)
+                        use_router = typer.confirm("Add Vue Router for Single Page Application development?", default=True)
+                        use_pinia = typer.confirm("Add Pinia for state management?", default=False)
+                        use_vitest = typer.confirm("Add Vitest for unit testing?", default=False)
+                        use_eslint = typer.confirm("Add ESLint for code quality?", default=True)
+                        use_prettier = typer.confirm("Add Prettier for code formatting?", default=True)
+                        
+                        # Build the command with all the flags
+                        vue_flags = ""
+                        if use_typescript:
+                            vue_flags += " --typescript"
+                        if use_jsx:
+                            vue_flags += " --jsx"
+                        if use_router:
+                            vue_flags += " --router"
+                        if use_pinia:
+                            vue_flags += " --pinia"
+                        if use_vitest:
+                            vue_flags += " --vitest"
+                        if use_eslint:
+                            vue_flags += " --eslint"
+                        if use_prettier:
+                            vue_flags += " --prettier"
+                            
+                        # Add all flags to the command (note: Vue CLI requires -- to pass flags)
+                        scaffold_command = f"npm init vue@latest {project_name} -- {vue_flags}"
+
+                # For Angular with interactive prompts
+                elif "ng new" in scaffold_command:
+                    if typer.confirm("Do you want to use Angular interactive setup? (No will use default settings)", default=True):
+                        scaffold_command = f"ng new {project_name}"
+                    else:
+                        # Get user preferences for Angular setup
+                        use_routing = typer.confirm("Would you like to add Angular routing?", default=True)
+                        style_format = typer.prompt(
+                            "Which stylesheet format would you like to use?",
+                            default="CSS",
+                            type=click.Choice(["CSS", "SCSS", "Sass", "Less"])
+                        )
+                        
+                        # Build the command with all the flags
+                        ng_flags = ""
+                        if use_routing:
+                            ng_flags += " --routing=true"
+                        else:
+                            ng_flags += " --routing=false"
+                            
+                        ng_flags += f" --style={style_format.lower()}"
+                        
+                        # Add all flags to the command
+                        scaffold_command = f"ng new {project_name}{ng_flags}"
                 else:
                     # Default behavior for other commands
                     has_project_arg = False
@@ -742,7 +863,6 @@ def init(prompt: str, directory: str = None, install: bool = typer.Option(True, 
                         scaffold_command = " ".join(command_parts)
                     else:
                         scaffold_command = f"{scaffold_command} {project_name}"
-                
                 
                 # For CREATES_OWN_DIR, we'll now:
                 # 1. First remove the target directory if it exists
@@ -771,6 +891,8 @@ def init(prompt: str, directory: str = None, install: bool = typer.Option(True, 
                 
                 # The working directory will be the parent directory
                 working_dir = project_dir.parent
+
+                
                 
             elif scaffold_type == "NEEDS_EMPTY_DIR":
                 # For NEEDS_EMPTY_DIR, we'll run inside the project directory but ensure it's empty
@@ -819,36 +941,79 @@ def init(prompt: str, directory: str = None, install: bool = typer.Option(True, 
             if typer.confirm("\nRun this scaffolding command?", default=True):
                 console.print("\n[bold green]Executing scaffolding command...[/bold green]")
                 
+                # Replace the existing subprocess.run block with this improved version that handles interactive inputs
                 try:
                     # Handle platform-specific command execution
                     shell = False
                     if sys.platform == "win32":
                         shell = True
                         # On Windows, use shell=True for npm/npx commands
-                        process = subprocess.run(
-                            scaffold_command,
-                            cwd=working_dir,
-                            capture_output=True,
-                            text=True,
-                            shell=shell
+                        
+                        # Check if this is an interactive command (Next.js, Vue, etc.)
+                        requires_interaction = (
+                            "create-next-app" in scaffold_command and "--typescript" not in scaffold_command or
+                            "vue@latest" in scaffold_command and "--typescript" not in scaffold_command or
+                            "ng new" in scaffold_command and "--routing" not in scaffold_command
                         )
+                        
+                        if requires_interaction:
+                            console.print("[yellow]Running interactive command. Please respond to prompts...[/yellow]")
+                            # For interactive commands, don't capture output so user can interact directly
+                            process = subprocess.run(
+                                scaffold_command,
+                                cwd=working_dir,
+                                shell=shell
+                            )
+                        else:
+                            # Non-interactive commands can capture output
+                            process = subprocess.run(
+                                scaffold_command,
+                                cwd=working_dir,
+                                capture_output=True,
+                                text=True,
+                                shell=shell
+                            )
                     else:
                         # Split the command properly using shlex for Unix-like systems
                         command_args = shlex.split(scaffold_command)
-                        process = subprocess.run(
-                            command_args,
-                            cwd=working_dir,
-                            capture_output=True,
-                            text=True,
-                            shell=shell
+                        
+                        # Check if this is an interactive command (Next.js, Vue, etc.)
+                        requires_interaction = (
+                            "create-next-app" in scaffold_command and "--typescript" not in scaffold_command or
+                            "vue@latest" in scaffold_command and "--typescript" not in scaffold_command or
+                            "ng new" in scaffold_command and "--routing" not in scaffold_command
                         )
+                        
+                        if requires_interaction:
+                            console.print("[yellow]Running interactive command. Please respond to prompts...[/yellow]")
+                            # For interactive commands, don't capture output so user can interact directly
+                            process = subprocess.run(
+                                command_args,
+                                cwd=working_dir,
+                                shell=shell
+                            )
+                        else:
+                            # Non-interactive commands can capture output
+                            process = subprocess.run(
+                                command_args,
+                                cwd=working_dir,
+                                capture_output=True,
+                                text=True,
+                                shell=shell
+                            )
                     
                     if process.returncode == 0:
-                        console.print(f"[bold green]Scaffolding completed successfully![/bold green]")
-                        console.print(process.stdout)
+                        if hasattr(process, 'stdout') and process.stdout:
+                            console.print(f"[bold green]Scaffolding completed successfully![/bold green]")
+                            console.print(process.stdout)
+                        else:
+                            console.print(f"[bold green]Scaffolding completed successfully![/bold green]")
                     else:
-                        console.print(f"[bold red]Scaffolding command failed with code {process.returncode}[/bold red]")
-                        console.print(f"Error: {process.stderr}")
+                        if hasattr(process, 'stderr') and process.stderr:
+                            console.print(f"[bold red]Scaffolding command failed with code {process.returncode}[/bold red]")
+                            console.print(f"Error: {process.stderr}")
+                        else:
+                            console.print(f"[bold red]Scaffolding command failed with code {process.returncode}[/bold red]")
                         
                         # Ask if user wants to continue with file generation even though scaffolding failed
                         if not typer.confirm("Continue with file generation anyway?", default=False):
@@ -861,84 +1026,6 @@ def init(prompt: str, directory: str = None, install: bool = typer.Option(True, 
                     if not typer.confirm("Continue with file generation anyway?", default=False):
                         typer.echo("Project initialization cancelled.")
                         raise typer.Exit()
-                
-                # Handle directory verification and cleanup after scaffolding
-                if scaffold_type == "CREATES_OWN_DIR":
-                    # Check if the expected directory was created
-                    if project_dir.exists():
-                        console.print(f"[bold green]Project directory created successfully at: {project_dir}[/bold green]")
-                    else:
-                        # Check common variations of the project directory name
-                        potential_dirs = [
-                            working_dir / project_name.lower(),
-                            working_dir / project_name.replace("-", "_"),
-                            working_dir / project_name.replace("_", "-")
-                        ]
-                        
-                        found_dir = None
-                        for potential_dir in potential_dirs:
-                            if potential_dir.exists() and potential_dir != project_dir:
-                                found_dir = potential_dir
-                                break
-                        
-                        if found_dir:
-                            console.print(f"[bold yellow]Project was created at: {found_dir}[/bold yellow]")
-                            
-                            # Three options: move files, rename directory, or use the new dir
-                            console.print("\nOptions:")
-                            console.print(f"1. Move files from {found_dir} to {project_dir}")
-                            console.print(f"2. Use {found_dir} as the project directory")
-                            console.print(f"3. Cancel project creation")
-                            
-                            choice = typer.prompt("Choose option", type=int, default=1)
-                            
-                            if choice == 1:
-                                # Create the target directory if it doesn't exist
-                                project_dir.mkdir(exist_ok=True, parents=True)
-                                
-                                # Move all contents from found_dir to project_dir
-                                try:
-                                    # Copy all files and subdirectories
-                                    for item in found_dir.iterdir():
-                                        if item.is_dir():
-                                            shutil.copytree(item, project_dir / item.name)
-                                        else:
-                                            shutil.copy2(item, project_dir / item.name)
-                                    
-                                    # Remove the source directory
-                                    shutil.rmtree(found_dir)
-                                    console.print(f"[green]Successfully moved files to {project_dir}[/green]")
-                                except Exception as e:
-                                    console.print(f"[bold red]Error moving files: {str(e)}[/bold red]")
-                                    console.print(f"[yellow]Will continue using {found_dir} as project directory[/yellow]")
-                                    project_dir = found_dir
-                            elif choice == 2:
-                                # Use the found directory
-                                project_dir = found_dir
-                                console.print(f"[green]Using {project_dir} as project directory[/green]")
-                            else:
-                                typer.echo("Project initialization cancelled.")
-                                raise typer.Exit()
-                        else:
-                            console.print(f"[bold red]Expected project directory was not created at {project_dir}[/bold red]")
-                            
-                            # Let user specify where the project was created
-                            new_dir = typer.prompt("Please enter the path where the project was created (or leave empty to cancel)")
-                            
-                            if new_dir:
-                                potential_dir = Path(new_dir)
-                                if potential_dir.exists():
-                                    project_dir = potential_dir
-                                    console.print(f"[green]Using {project_dir} as project directory[/green]")
-                                else:
-                                    console.print(f"[bold red]Directory {potential_dir} does not exist.[/bold red]")
-                                    if not typer.confirm("Continue with file generation anyway?", default=False):
-                                        typer.echo("Project initialization cancelled.")
-                                        raise typer.Exit()
-                            else:
-                                typer.echo("Project initialization cancelled.")
-                                raise typer.Exit()
-        
         # Improved file generation prompt with more context - now considers scaffolded files
         file_generation_prompt = f"""
         Based on the project description: "{prompt}"
@@ -1014,8 +1101,44 @@ def init(prompt: str, directory: str = None, install: bool = typer.Option(True, 
         failed_files = []
         skipped_files = []
         
+        # Extract dependency imports from React files to add to package.json later
+        import_patterns = [
+            r'import\s+.*?\s+from\s+[\'"]([^.][^\'"]*)[\'"]\s*;?',  # ES6 imports
+            r'require\s*\(\s*[\'"]([^.][^\'"]*)[\'"]\s*\)',  # CommonJS imports
+            r'@import\s+[\'"]([^.][^\'"]*)[\'"]\s*;?',      # CSS imports
+        ]
+        
+        detected_dependencies = set()
+        
         for file_path, content in file_matches:
             full_path = project_dir / file_path.strip()
+            
+            # Check if this is a JS/JSX/TS/TSX file to scan for imports
+            if file_path.endswith(('.js', '.jsx', '.ts', '.tsx')):
+                for pattern in import_patterns:
+                    imports = re.findall(pattern, content)
+                    for imported in imports:
+                        # Filter out relative imports and standard node modules
+                        if (not imported.startswith('.') and 
+                            not imported.startswith('node:') and 
+                            imported != 'react' and
+                            imported != 'react-dom' and
+                            not imported.startswith('fs') and
+                            not imported.startswith('path')):
+                            
+                            # Handle scope packages and extract base package name
+                            if '/' in imported:
+                                parts = imported.split('/')
+                                if parts[0].startswith('@'):
+                                    # It's a scoped package like @mui/material
+                                    base_package = f"{parts[0]}/{parts[1]}"
+                                else:
+                                    # It's a submodule like react-router/dom
+                                    base_package = parts[0]
+                            else:
+                                base_package = imported
+                            
+                            detected_dependencies.add(base_package)
             
             # Check if file already exists (might have been created by scaffolding)
             if full_path.exists():
@@ -1033,7 +1156,7 @@ def init(prompt: str, directory: str = None, install: bool = typer.Option(True, 
                     console.print(f"Skipped (already exists): [yellow]{file_path}[/yellow]")
                     skipped_files.append(str(full_path))
                 continue
-            
+                  
             # Create directories if they don't exist
             try:
                 full_path.parent.mkdir(parents=True, exist_ok=True)
@@ -1047,384 +1170,319 @@ def init(prompt: str, directory: str = None, install: bool = typer.Option(True, 
                 failed_files.append((file_path, str(e)))
                 console.print(f"Error creating {file_path}: {str(e)}", style="bold red")
         
-        # Extract setup commands from the project info
-        setup_commands_list = []
-        if setup_commands and setup_commands != "Not specified":
-            # Split commands by newlines and filter empty lines or comments
-            setup_commands_list = [cmd.strip() for cmd in re.split(r"\n+", setup_commands.strip()) 
-                                  if cmd.strip() and not cmd.strip().startswith("#")]
+        # After creating files but before running setup commands, check for important files
+        try:
+            # Check for important files based on project type
+            missing_files = []
+            critical_file_patterns = {
+                "react": ["package.json", "src/App.*", "public/index.html"],
+                "vue": ["package.json", "src/App.vue", "src/main.js"],
+                "angular": ["package.json", "angular.json", "src/app"],
+                "next.js": ["package.json", "next.config.js"],
+                "express": ["package.json", "app.js"],
+                "django": ["manage.py", "*/settings.py"],
+                "flask": ["app.py", "requirements.txt"],
+                "spring": ["pom.xml", "src/main/java"],
+                "laravel": ["composer.json", "artisan"],
+                ".net": ["*.csproj", "Program.cs"],
+                "flutter": ["pubspec.yaml", "lib/main.dart"]
+            }
+            
+            # Determine project type based on keywords in project_type
+            detected_types = []
+            project_type_lower = project_type.lower()
+            
+            for framework in critical_file_patterns.keys():
+                if framework.lower() in project_type_lower:
+                    detected_types.append(framework)
+            
+            # Determine if this is a Node.js or other type of project
+            is_node_project = (project_dir / "package.json").exists()
+            is_python_project = (project_dir / "requirements.txt").exists() or (project_dir / "setup.py").exists() or list(project_dir.glob("*.py"))
+            
+            # If no specific type detected but we have additional clues
+            if not detected_types:
+                if is_node_project and any("react" in file for file in created_files):
+                    detected_types.append("react")
+                elif is_node_project and any("vue" in file for file in created_files):
+                    detected_types.append("vue")
+                elif is_node_project and any("angular" in file for file in created_files):
+                    detected_types.append("angular")
+                elif is_node_project and any("next" in file for file in created_files):
+                    detected_types.append("next.js")
+                elif is_node_project and any("express" in file for file in created_files):
+                    detected_types.append("express")
+                elif is_python_project and any("django" in file for file in created_files):
+                    detected_types.append("django")
+                elif is_python_project and any("flask" in file for file in created_files):
+                    detected_types.append("flask")
+            
+            # Check for missing critical files for each detected type
+            for detected_type in detected_types:
+                patterns = critical_file_patterns.get(detected_type, [])
+                for pattern in patterns:
+                    # Handle wildcards in patterns
+                    found = False
+                    if "*" in pattern:
+                        matching_files = list(project_dir.glob(pattern))
+                        found = len(matching_files) > 0
+                    else:
+                        found = (project_dir / pattern).exists()
+                    
+                    if not found:
+                        missing_files.append((detected_type, pattern))
+            
+            # Notify user of missing files
+            # Notify user of missing files
+            if missing_files:
+                console.print("\n[bold yellow]Warning: Some expected files are missing:[/bold yellow]")
+                for framework, file_pattern in missing_files:
+                    console.print(f" - Missing [{framework}]: {file_pattern}")
+                console.print("This may indicate incomplete project scaffolding. Consider checking the files manually.")
+        except Exception as e:
+            console.print(f"\n[bold yellow]Warning: Error checking for critical files: {str(e)}[/bold yellow]")
         
-        # NEW: Enhanced command execution function that supports a queue of commands
-        def execute_command_sequence(commands, working_directory, console):
-            """Execute a sequence of commands, ensuring npm install commands run before start commands"""
-            
-            # Track the current working directory for this sequence
-            current_dir = working_directory
-            environment = os.environ.copy()
-            success_count = 0
-            failed_count = 0
-            
-            # Parse and clean commands from the input
-            cleaned_commands = []
-            for cmd in commands:
-                cmd = cmd.strip()
-                
-                # Extract the actual command from numbered format like "1. npm install"
-                if re.match(r'^\d+\.\s+', cmd):
-                    cmd = re.sub(r'^\d+\.\s+', '', cmd)
-                
-                # Remove surrounding quotes and backticks if present
-                if (cmd.startswith("'") and cmd.endswith("'")) or (cmd.startswith('"') and cmd.endswith('"')):
-                    cmd = cmd[1:-1]
-                
-                # Remove backticks
-                cmd = cmd.replace('`', '')
-                
-                # Remove parenthetical comments or notes - like (install dependencies)
-                cmd = re.sub(r'\s*\([^)]*\)', '', cmd)
-                
-                # Skip empty commands
-                if not cmd:
-                    continue
-                    
-                cleaned_commands.append(cmd)
-            
-            # Organize commands by type
-            create_app_command = None
-            install_commands = []
-            start_command = None
-            other_commands = []
-            
-            for cmd in cleaned_commands:
-                # Skip CD commands entirely as requested
-                if cmd.startswith('cd '):
-                    console.print(f"[yellow]Skipping CD command: {cmd} - already in target directory[/yellow]")
-                    continue
-                    
-                # Handle create-react-app command (but typically skip execution)
-                elif 'npx create-react-app' in cmd:
-                    create_app_command = cmd
-                    continue
-                    
-                # Handle npm/yarn install commands - prioritize these
-                elif ('npm install' in cmd or 'yarn add' in cmd or 'pnpm install' in cmd):
-                    install_commands.append(cmd)
-                    
-                # Handle start commands - these should run last
-                elif ('npm start' in cmd or 'npm run start' in cmd or 'yarn start' in cmd):
-                    start_command = cmd
-                    
-                # All other commands
-                else:
-                    other_commands.append(cmd)
-            
-            # Create the final ordered command list - installs first, then other commands, then start command
-            final_commands = install_commands + other_commands
-            if start_command:
-                final_commands.append(start_command)
-            
-            # Execute commands in order
-            for cmd in final_commands:
-                console.print(f"\n[bold]Executing:[/bold] {cmd}")
-                
+        # Merge detected dependencies with those from the plan
+        if detected_dependencies:
+            console.print(f"\n[bold cyan]Detected additional dependencies from imports:[/bold cyan]")
+            for dep in sorted(detected_dependencies):
+                console.print(f" - {dep}")
+                if dep not in extracted_dependencies:
+                    extracted_dependencies.append(dep)
+        
+        # Update package.json with detected dependencies if needed
+        if is_node_project and detected_dependencies:
+            package_json_path = project_dir / "package.json"
+            if package_json_path.exists():
                 try:
-                    shell = sys.platform == "win32"  # Use shell=True for Windows
+                    with open(package_json_path, "r") as f:
+                        package_data = json.load(f)
                     
-                    if shell:
-                        process = subprocess.run(
-                            cmd,
-                            cwd=current_dir,
-                            capture_output=True,
-                            text=True,
-                            shell=True,
-                            env=environment
-                        )
-                    else:
-                        # Split the command properly using shlex for Unix-like systems
-                        command_args = shlex.split(cmd)
-                        process = subprocess.run(
-                            command_args,
-                            cwd=current_dir,
-                            capture_output=True,
-                            text=True,
-                            env=environment
-                        )
+                    # Check if dependencies section exists
+                    if "dependencies" not in package_data:
+                        package_data["dependencies"] = {}
                     
-                    if process.returncode == 0:
-                        console.print(f"[green]Command completed successfully[/green]")
-                        if process.stdout:
-                            console.print(process.stdout)
-                        success_count += 1
-                    else:
-                        console.print(f"[bold red]Command failed with code {process.returncode}[/bold red]")
-                        console.print(f"Error: {process.stderr}")
-                        
-                        # If a command fails with "module not found" or similar, try installing it
-                        if "Cannot find module" in process.stderr or "not found" in process.stderr:
-                            # Extract package name from error message
-                            error_lines = process.stderr.splitlines()
-                            for line in error_lines:
-                                if "Cannot find module" in line or "not found" in line:
-                                    # Try to extract package name
-                                    match = re.search(r"'([^']+)'", line)
-                                    if match:
-                                        package_name = match.group(1)
-                                        console.print(f"[yellow]Attempting to install missing package: {package_name}[/yellow]")
-                                        
-                                        # Try to install the missing package
-                                        install_cmd = f"npm install {package_name}"
-                                        console.print(f"[bold]Executing:[/bold] {install_cmd}")
-                                        
-                                        try:
-                                            if shell:
-                                                install_process = subprocess.run(
-                                                    install_cmd,
-                                                    cwd=current_dir,
-                                                    capture_output=True,
-                                                    text=True,
-                                                    shell=True,
-                                                    env=environment
-                                                )
-                                            else:
-                                                install_process = subprocess.run(
-                                                    shlex.split(install_cmd),
-                                                    cwd=current_dir,
-                                                    capture_output=True,
-                                                    text=True,
-                                                    env=environment
-                                                )
-                                            
-                                            if install_process.returncode == 0:
-                                                console.print(f"[green]Package {package_name} installed successfully[/green]")
-                                                # Retry the original command
-                                                console.print(f"[yellow]Retrying original command: {cmd}[/yellow]")
-                                                if shell:
-                                                    process = subprocess.run(
-                                                        cmd,
-                                                        cwd=current_dir,
-                                                        capture_output=True,
-                                                        text=True,
-                                                        shell=True,
-                                                        env=environment
-                                                    )
-                                                else:
-                                                    process = subprocess.run(
-                                                        shlex.split(cmd),
-                                                        cwd=current_dir,
-                                                        capture_output=True,
-                                                        text=True,
-                                                        env=environment
-                                                    )
-                                                
-                                                if process.returncode == 0:
-                                                    console.print(f"[green]Command completed successfully after installing dependencies[/green]")
-                                                    success_count += 1
-                                                    continue
-                                            else:
-                                                console.print(f"[bold red]Failed to install package {package_name}[/bold red]")
-                                        except Exception as e:
-                                            console.print(f"[bold red]Error installing package: {str(e)}[/bold red]")
-                        
-                        failed_count += 1
-                        
-                        # Ask to continue or abort
-                        if not typer.confirm("Command failed. Continue with next command?", default=True):
-                            break
+                    # Add missing dependencies with default version
+                    dependencies_modified = False
+                    for dep in detected_dependencies:
+                        if dep not in package_data["dependencies"]:
+                            package_data["dependencies"][dep] = "latest"
+                            dependencies_modified = True
+                    
+                    # Save updated package.json
+                    if dependencies_modified:
+                        with open(package_json_path, "w") as f:
+                            json.dump(package_data, f, indent=2)
+                        console.print(f"[bold green]Updated package.json with detected dependencies[/bold green]")
                 except Exception as e:
-                    console.print(f"[bold red]Error executing command: {str(e)}[/bold red]")
-                    failed_count += 1
+                    console.print(f"[bold yellow]Could not update package.json: {str(e)}[/bold yellow]")
+        
+        # Provide a summary of file creation
+        console.print("\n[bold cyan]Project Creation Summary:[/bold cyan]")
+        console.print(f"Created {len(created_files)} files")
+        if skipped_files:
+            console.print(f"Skipped {len(skipped_files)} existing files")
+        if failed_files:
+            console.print(f"[bold red]Failed to create {len(failed_files)} files[/bold red]")
+            for file_path, error in failed_files:
+                console.print(f" - {file_path}: {error}")
+        
+        # Execute setup commands if provided
+        if setup_commands and setup_commands.strip():
+            setup_cmds = [cmd.strip() for cmd in setup_commands.split('\n') if cmd.strip()]
+            
+            if setup_cmds:
+                console.print("\n[bold cyan]Setup Commands:[/bold cyan]")
+                for cmd in setup_cmds:
+                    console.print(f" - {cmd}")
+                
+                if typer.confirm("\nRun setup commands?", default=True):
+                    for cmd in setup_cmds:
+                        console.print(f"\n[bold green]Executing: {cmd}[/bold green]")
+                        try:
+                            # Handle platform-specific command execution
+                            shell = True if sys.platform == "win32" else False
+                            process = subprocess.run(
+                                cmd,
+                                cwd=project_dir,
+                                shell=shell,
+                                capture_output=True,
+                                text=True
+                            )
+                            
+                            if process.returncode == 0:
+                                console.print("[green]Command executed successfully[/green]")
+                                if process.stdout.strip():
+                                    console.print(process.stdout)
+                            else:
+                                console.print(f"[bold red]Command failed with code {process.returncode}[/bold red]")
+                                console.print(f"Error: {process.stderr}")
+                                
+                                if not typer.confirm("Continue with next command?", default=True):
+                                    break
+                        except Exception as e:
+                            console.print(f"[bold red]Error executing command: {str(e)}[/bold red]")
+                            
+                            if not typer.confirm("Continue with next command?", default=True):
+                                break
+        
+        # Install dependencies if requested
+        if install:
+            package_managers = {
+                "npm": ("package.json", "npm install"),
+                "yarn": ("package.json", "yarn"),
+                "pip": ("requirements.txt", "pip install -r requirements.txt"),
+                "pipenv": ("Pipfile", "pipenv install"),
+                "maven": ("pom.xml", "mvn install"),
+                "gradle": ("build.gradle", "gradle build"),
+                "composer": ("composer.json", "composer install"),
+                "nuget": (["*.csproj", "*.fsproj"], "dotnet restore"),
+                "pub": ("pubspec.yaml", "flutter pub get")
+            }
+            
+            # Detect available package managers based on files
+            available_package_managers = []
+            for pm, (file_indicator, install_cmd) in package_managers.items():
+                if isinstance(file_indicator, list):
+                    if any(len(list(project_dir.glob(pattern))) > 0 for pattern in file_indicator):
+                        available_package_managers.append((pm, install_cmd))
+                elif (project_dir / file_indicator).exists():
+                    available_package_managers.append((pm, install_cmd))
+            
+            if available_package_managers:
+                console.print("\n[bold cyan]Available Package Managers:[/bold cyan]")
+                for i, (pm, cmd) in enumerate(available_package_managers):
+                    console.print(f"{i+1}. {pm} ({cmd})")
+                
+                if len(available_package_managers) == 1:
+                    pm_choice = 0
+                else:
+                    pm_choice = typer.prompt(
+                        "Choose package manager to install dependencies",
+                        type=int,
+                        default=1
+                    ) - 1
+                
+                if 0 <= pm_choice < len(available_package_managers):
+                    pm, install_cmd = available_package_managers[pm_choice]
+                    console.print(f"\n[bold green]Installing dependencies with {pm}...[/bold green]")
                     
-                    # Ask to continue or abort
-                    if not typer.confirm("Error occurred. Continue with next command?", default=True):
+                    try:
+                        # For npm/yarn, check if we have additional detected dependencies
+                        if pm in ["npm", "yarn"] and extracted_dependencies:
+                            # Ask if user wants to install detected dependencies
+                            if typer.confirm(f"Install {len(extracted_dependencies)} detected dependencies?", default=True):
+                                dep_command = f"npm install --save {' '.join(extracted_dependencies)}" if pm == "npm" else f"yarn add {' '.join(extracted_dependencies)}"
+                                console.print(f"[bold green]Executing: {dep_command}[/bold green]")
+                                
+                                process = subprocess.run(
+                                    dep_command,
+                                    cwd=project_dir,
+                                    shell=True,
+                                    capture_output=True,
+                                    text=True
+                                )
+                                
+                                if process.returncode == 0:
+                                    console.print("[green]Dependencies installed successfully[/green]")
+                                else:
+                                    console.print(f"[bold red]Failed to install dependencies: {process.stderr}[/bold red]")
+                        
+                        # Run the main install command
+                        process = subprocess.run(
+                            install_cmd,
+                            cwd=project_dir,
+                            shell=True,
+                            capture_output=True,
+                            text=True
+                        )
+                        
+                        if process.returncode == 0:
+                            console.print("[green]Dependencies installed successfully[/green]")
+                        else:
+                            console.print(f"[bold red]Failed to install dependencies: {process.stderr}[/bold red]")
+                    except Exception as e:
+                        console.print(f"[bold red]Error installing dependencies: {str(e)}[/bold red]")
+            else:
+                console.print("\n[yellow]No package manager detected for this project type[/yellow]")
+        
+        # Run the application if requested
+        if run:
+            run_commands = {
+                "npm": "npm start",
+                "react": "npm start",
+                "vue": "npm run dev",
+                "angular": "ng serve",
+                "next.js": "npm run dev",
+                "express": "node app.js",
+                "django": "python manage.py runserver",
+                "flask": "flask run",
+                "spring": "mvn spring-boot:run",
+                "laravel": "php artisan serve",
+                ".net": "dotnet run",
+                "flutter": "flutter run"
+            }
+            
+            # Determine run command based on project type
+            run_command = None
+            
+            # Check if package.json has start script
+            package_json_path = project_dir / "package.json"
+            if package_json_path.exists():
+                try:
+                    with open(package_json_path, "r") as f:
+                        package_data = json.load(f)
+                    
+                    if "scripts" in package_data and "start" in package_data["scripts"]:
+                        run_command = "npm start"
+                    elif "scripts" in package_data and "dev" in package_data["scripts"]:
+                        run_command = "npm run dev"
+                except Exception:
+                    pass
+            
+            # If no run command found from package.json, try project type
+            if not run_command:
+                for detected_type in detected_types:
+                    if detected_type in run_commands:
+                        run_command = run_commands[detected_type]
                         break
             
-            return success_count, failed_count
-        
-        # Detect package manager and dependencies
-        package_manager = "npm"  # Default to npm
-        
-        # Try to detect the right package manager
-        if (project_dir / "yarn.lock").exists():
-            package_manager = "yarn"
-        elif (project_dir / "pnpm-lock.yaml").exists():
-            package_manager = "pnpm"
-        elif (project_dir / "bun.lockb").exists():
-            package_manager = "bun"
-        
-        # Determine if this is a Node.js or other type of project
-        is_node_project = (project_dir / "package.json").exists()
-        is_python_project = (project_dir / "requirements.txt").exists() or (project_dir / "setup.py").exists() or list(project_dir.glob("*.py"))
-        is_ruby_project = (project_dir / "Gemfile").exists()
-        is_java_project = (project_dir / "pom.xml").exists() or (project_dir / "build.gradle").exists()
-        is_dotnet_project = list(project_dir.glob("*.csproj")) or list(project_dir.glob("*.fsproj"))
-        is_php_project = (project_dir / "composer.json").exists()
-        is_flutter_project = (project_dir / "pubspec.yaml").exists()
-        
-        # Determine install and run commands based on project type
-        install_commands = []
-        run_commands = []
-        
-        # If setup commands were provided in the project plan, use those first
-        if setup_commands_list:
-            # Look for commands that appear to be installation commands
-            install_patterns = ["install", "restore", "update", "bundle", "composer", "pip", "npm i", "yarn"]
-            for cmd in setup_commands_list:
-                # Check if this looks like an install command
-                if any(pattern in cmd.lower() for pattern in install_patterns):
-                    install_commands.append(cmd)
-                    setup_commands_list.remove(cmd)
-                    break
-        
-        # If no install commands were found in setup_commands, generate based on project type
-        if not install_commands:
-            if is_node_project:
-                # For Node.js projects
-                install_commands.append(f"{package_manager} install")
-            elif is_python_project:
-                # For Python projects
-                if (project_dir / "requirements.txt").exists():
-                    install_commands.append("pip install -r requirements.txt")
-                elif (project_dir / "setup.py").exists():
-                    install_commands.append("pip install -e .")
-                else:
-                    # Look for any Pipfile as an alternative
-                    if (project_dir / "Pipfile").exists():
-                        install_commands.append("pipenv install")
-            elif is_ruby_project:
-                install_commands.append("bundle install")
-            elif is_java_project:
-                if (project_dir / "pom.xml").exists():
-                    install_commands.append("mvn install")
-                else:
-                    install_commands.append("gradle build")
-            elif is_dotnet_project:
-                install_commands.append("dotnet restore")
-            elif is_php_project:
-                install_commands.append("composer install")
-            elif is_flutter_project:
-                install_commands.append("flutter pub get")
-        
-        # Determine run commands if needed
-        if run and not run_commands:
-            if is_node_project:
-                # Check package.json for scripts
-                try:
-                    import json
-                    package_json_path = project_dir / "package.json"
-                    if package_json_path.exists():
-                        with open(package_json_path, 'r') as f:
-                            package_data = json.load(f)
-                            scripts = package_data.get('scripts', {})
-                            
-                            # Priority order for scripts
-                            for script_name in ['dev', 'start', 'serve', 'develop']:
-                                if script_name in scripts:
-                                    run_commands.append(f"{package_manager} run {script_name}")
-                                    break
-                except Exception as e:
-                    console.print(f"[yellow]Warning: Could not parse package.json: {str(e)}[/yellow]")
-            elif is_python_project:
-                # Try to detect Flask, Django, or FastAPI apps
-                if list(project_dir.glob("**/manage.py")):
-                    run_commands.append("python manage.py runserver")
-                elif list(project_dir.glob("**/app.py")) or list(project_dir.glob("**/main.py")):
-                    main_file = next(project_dir.glob("**/app.py"), None) or next(project_dir.glob("**/main.py"), None)
-                    if main_file:
-                        run_commands.append(f"python {main_file.relative_to(project_dir)}")
-            elif is_ruby_project:
-                if (project_dir / "config.ru").exists() or (project_dir / "config" / "application.rb").exists():
-                    run_commands.append("rails server")
-            elif is_dotnet_project:
-                run_commands.append("dotnet run")
-            elif is_flutter_project:
-                run_commands.append("flutter run")
-        
-        # Add any remaining setup commands to the execution queue
-        execution_queue = []
-        if install and install_commands:
-            execution_queue.extend(install_commands)
-        
-        # Add remaining setup commands
-        if setup_commands_list:
-            execution_queue.extend(setup_commands_list)
-        
-        # Add run commands at the end
-        if run and run_commands:
-            execution_queue.extend(run_commands)
-        
-        # Execute all queued commands if there are any
-        if execution_queue:
-            console.print(Panel.fit("Executing Setup Commands", title="Setup"))
+            # Common file-based detection as fallback
+            if not run_command:
+                if (project_dir / "manage.py").exists():
+                    run_command = "python manage.py runserver"
+                elif (project_dir / "app.py").exists():
+                    run_command = "flask run"
+                elif list(project_dir.glob("*.csproj")):
+                    run_command = "dotnet run"
+                elif (project_dir / "app.js").exists() or (project_dir / "server.js").exists():
+                    run_command = "node app.js" if (project_dir / "app.js").exists() else "node server.js"
             
-            for i, cmd in enumerate(execution_queue):
-                console.print(f"\n[bold cyan]Command {i+1}/{len(execution_queue)}:[/bold cyan] {cmd}")
-            
-            # Ask user permission before running commands
-            if typer.confirm("\nRun these setup commands?", default=True):
-                success_count, failed_count = execute_command_sequence(execution_queue, project_dir, console)
+            if run_command:
+                console.print(f"\n[bold cyan]Run Command Detected: {run_command}[/bold cyan]")
                 
-                if failed_count > 0:
-                    console.print(f"\n[bold yellow]Command execution completed with {failed_count} errors[/bold yellow]")
-                else:
-                    console.print("\n[bold green]All commands executed successfully![/bold green]")
+                if typer.confirm("Run the application?", default=True):
+                    console.print(f"\n[bold green]Executing: {run_command}[/bold green]")
+                    try:
+                        # For simplicity, we'll run this in a non-capturing way so the user sees the output directly
+                        subprocess.run(
+                            run_command,
+                            cwd=project_dir,
+                            shell=True
+                        )
+                    except KeyboardInterrupt:
+                        console.print("\n[yellow]Application stopped by user[/yellow]")
+                    except Exception as e:
+                        console.print(f"\n[bold red]Error running application: {str(e)}[/bold red]")
             else:
-                console.print("\n[yellow]Setup commands skipped[/yellow]")
+                console.print("\n[yellow]No run command detected for this project type[/yellow]")
         
-        # Final project summary
-        console.print(Panel.fit(f"Project setup complete: {project_dir}", title="Success"))
-        
-        console.print(f"\n[bold green]Project Files:[/bold green]")
-        console.print(f"Created {len(created_files)} files, Skipped {len(skipped_files)} files, Failed {len(failed_files)} files")
-        
-        # Instructions for next steps
-        console.print("\n[bold]Next Steps:[/bold]")
-        console.print(f"1. Navigate to the project directory: cd {project_dir}")
-        
-        if not execution_queue or not install:
-            if install_commands:
-                console.print(f"2. Install dependencies: {install_commands[0]}")
-        
-        if not execution_queue or not run:
-            if run_commands:
-                console.print(f"3. Run the application: {run_commands[0]}")
-        
-        # Record any warnings or errors for future reference
-        if failed_files:
-            console.print("\n[bold red]Warning: Some files could not be created:[/bold red]")
-            for file_path, error in failed_files:
-                console.print(f"- {file_path}: {error}")
-        
-        # Final message
-        if not execution_queue or (failed_count > 0 and success_count == 0):
-            console.print("\n[bold yellow]Note: Setup commands were not fully executed. You may need to run them manually.[/bold yellow]")
-        
-        # Create a project report
-        try:
-            report_path = project_dir / "claude_project_report.md"
-            with open(report_path, "w") as f:
-                f.write(f"# Project Setup Report\n\n")
-                f.write(f"## Project Description\n\n{prompt}\n\n")
-                f.write(f"## Project Type\n\n{project_type}\n\n")
-                f.write(f"## Project Blueprint\n\n{plan_response}\n\n")
-                f.write(f"## Files Created\n\n")
-                for file in created_files:
-                    f.write(f"- {file}\n")
-                if skipped_files:
-                    f.write(f"\n## Files Skipped\n\n")
-                    for file in skipped_files:
-                        f.write(f"- {file}\n")
-                if failed_files:
-                    f.write(f"\n## Files Failed\n\n")
-                    for file_path, error in failed_files:
-                        f.write(f"- {file_path}: {error}\n")
-                if execution_queue:
-                    f.write(f"\n## Setup Commands\n\n")
-                    for cmd in execution_queue:
-                        f.write(f"- `{cmd}`\n")
-            console.print(f"\n[green]Project report created at: {report_path}[/green]")
-        except Exception as e:
-            console.print(f"[yellow]Could not create project report: {str(e)}[/yellow]")
-
+        # Successful completion message with project path
+        console.print(Panel.fit(
+            f"Project successfully created at:\n[bold green]{project_dir}[/bold green]",
+            title="Success",
+            border_style="green"
+        ))
 @app.command()
 @require_api_key
 def review(
